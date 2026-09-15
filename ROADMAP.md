@@ -4,7 +4,7 @@ sangerQC is not a fitted ML model on a few files. It is a **calibration instrume
 
 ## 1. Graphical output
 
-**Status: first cut in the hosted viewer and the Streamlit app.**
+**Status: hosted viewer has PLOC grid, HQ/α/β lines, horizontal scroll, auto-Y on the visible window, Y and px/scan sliders, α/β sliders, multiple open files.**
 
 - Vertical bars on the **PLOC grid** (scan of each called peak), not a uniform base/time axis. That is the “corrected position grid”.
 - Horizontal lines for **significance thresholds across the four dye signals**, currently this read’s own HQ-body amplitude: HQ, α·HQ (relative tests off), β·HQ (stop).

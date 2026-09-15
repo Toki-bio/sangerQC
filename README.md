@@ -4,9 +4,11 @@ Quality-aware conversion of Sanger `.ab1` chromatograms to sequence, from the **
 
 The GitHub repo page is source code only — there is no upload control there.
 
-Interactive viewer (drop or choose an `.ab1` in the browser; the file does not leave the machine):
+Interactive viewer:
 
 **https://toki-bio.github.io/sangerQC/docs/index.html**
+
+Horizontal scroll along the full read, auto vertical zoom on the visible window, Y / px-per-scan / α / β sliders, several `.ab1` files at once. The file does not leave the machine.
 
 Vertical bars are the called-peak scan positions (`PLOC`) — a corrected position grid, not evenly spaced time. Horizontal dashed lines are this read’s own HQ-body amplitude thresholds (α = relative tests off, β = stop).
 
