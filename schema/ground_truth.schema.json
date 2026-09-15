@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sangerQC ground-truth record",
+  "type": "object",
+  "required": ["file", "start", "end", "class", "grade", "annotator", "date"],
+  "properties": {
+    "file": { "type": "string", "description": "Read id, not necessarily a path." },
+    "start": { "type": "integer", "minimum": 1 },
+    "end": { "type": "integer", "minimum": 1 },
+    "called": { "type": "string", "description": "Optional base string for the span." },
+    "class": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "stochastic",
+        "bump_start",
+        "slow_decay_readable",
+        "stop_level",
+        "shared_hump",
+        "g_raise",
+        "merged_blob",
+        "oversaturation",
+        "homopolymer",
+        "periodicity_loss",
+        "primer_not_locus",
+        "unresolved_replicate_conflict"
+      ]
+    },
+    "grade": { "type": "string", "enum": ["M1", "M2", "C1", "C2"] },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["FR", "RR", "DP", "DM", "REF", "MANUAL"] }
+    },
+    "job": {
+      "type": "string",
+      "enum": ["call_reliability", "letter_identity"],
+      "description": "Quality class vs true letter. Concordance answers the second; the chromatogram answers the first."
+    },
+    "annotator": { "type": "string" },
+    "date": { "type": "string", "format": "date" },
+    "notes": { "type": "string" }
+  }
+}

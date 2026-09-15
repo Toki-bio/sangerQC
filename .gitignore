@@ -1,0 +1,22 @@
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# App output
+*.png
+!docs/*.png
+tmp/
+.streamlit/
+
+# Do not publish unpublished chromatograms
+*.ab1
+*.abif

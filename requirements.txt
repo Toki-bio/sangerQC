@@ -1,0 +1,4 @@
+numpy>=1.23
+biopython>=1.80
+matplotlib>=3.7
+streamlit>=1.32
