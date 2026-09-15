@@ -10,10 +10,10 @@
   <header>
     <h1>sangerQC</h1>
     <p class="lede">
-      Letters under the trace are three rows: <strong>ABI</strong> = machine
-      PBAS (often terrible at blobs / mixed peaks), <strong>v0.2</strong> =
-      those same letters with N where the classifier rejects (not a new
-      caller), <strong>Chr</strong> = Chromas/edited FASTA if you drop one.
+      Letters use dye colours (G black, A green, T red, C blue).
+      <strong>v0.2</strong> is the masked sequence (N = rejected, not a new
+      caller). <strong>ABI≠</strong> shows the machine letter only where it
+      differs. <strong>Chr</strong> is a dropped Chromas FASTA.
       Left scale is RFU. Overlay: red = relative-bad, teal = low-amp keep,
       purple = stop, orange = spike. Nothing is uploaded.
     </p>
@@ -68,9 +68,9 @@
       </menu>
     </form>
   </dialog>
-  <script src="abif.js"></script>
-  <script src="classify.js"></script>
-  <script src="compare.js"></script>
-  <script src="viewer.js"></script>
+  <script src="abif.js?v=6"></script>
+  <script src="classify.js?v=6"></script>
+  <script src="compare.js?v=6"></script>
+  <script src="viewer.js?v=6"></script>
 </body>
 </html>

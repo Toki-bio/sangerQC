@@ -1,6 +1,6 @@
 const DYE = { A: "#2ca02c", C: "#1f77b4", G: "#111111", T: "#d62728" };
 const TRACE_H = 236;
-const ROW_H = 14;
+const ROW_H = 16;
 const PAD = { l: 56, r: 8, t: 22, b: 8 };
 const REASON_FILL = {
   relative: "rgba(204,68,68,0.20)",
@@ -298,16 +298,18 @@ function drawOne(item) {
   }
 
   const rows = [
-    { label: "ABI", letters: rec.seq, kind: "abi" },
+    { label: "ABI≠", letters: rec.seq, kind: "abi" },
     { label: "v0.2", letters: item.v02, kind: "v02" },
   ];
   if (item.chromas) rows.push({ label: "Chr", letters: item.chromas.map, kind: "chr" });
 
-  ctx.font = "11px ui-monospace, Consolas, monospace";
+  ctx.font = "bold 12px ui-monospace, Consolas, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   const row0 = PAD.t + plotH + 4;
   if (showLetters) {
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       const y = row0 + r * ROW_H;
@@ -315,8 +317,16 @@ function drawOne(item) {
         const sc = rec.ploc[i];
         if (sc < scan0 || sc > scan1) continue;
         const ch = row.letters[i] || "";
-        ctx.fillStyle = letterColor(row.kind, ch, rec.seq[i]);
-        ctx.fillText(ch, sx(sc), y);
+        if (row.kind === "abi" && !abiDiffers(ch, item.v02[i])) continue;
+        const x = sx(sc);
+        if (row.kind === "abi") {
+          ctx.fillStyle = "rgba(255, 220, 80, 0.45)";
+          ctx.fillRect(x - 6, y - 1, 12, ROW_H);
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.strokeText(ch, x, y);
+        ctx.fillStyle = letterColor(ch);
+        ctx.fillText(ch, x, y);
       }
     }
   }
@@ -371,21 +381,22 @@ function drawOne(item) {
   }
 }
 
-function letterColor(kind, ch, abi) {
+function abiDiffers(abi, v02) {
+  const a = (abi || "").toUpperCase();
+  const b = (v02 || "").toUpperCase();
+  if (!a) return false;
+  return a !== b;
+}
+
+function letterColor(ch) {
   if (!ch || ch === "-") return "#bbb";
-  if (kind === "abi") {
-    return /[ACGT]/i.test(ch) ? "#666" : "#aa0000";
-  }
-  if (kind === "v02") {
-    if (ch === "N") return "#993399";
-    if (ch === ch.toLowerCase()) return "#1a7a72";
-    return "#111";
-  }
-  if (ch.toUpperCase() === "N") return "#2a9d8f";
-  if (abi && ch.toUpperCase() !== abi.toUpperCase() && /[ACGT]/i.test(ch) && /[ACGT]/i.test(abi)) {
-    return "#aa0000";
-  }
-  return "#1a5f8a";
+  const u = ch.toUpperCase();
+  if (u === "A") return DYE.A;
+  if (u === "C") return DYE.C;
+  if (u === "G") return DYE.G;
+  if (u === "T") return DYE.T;
+  if (u === "N") return "#7a3a8a";
+  return "#aa0000";
 }
 
 function drawAll() {
@@ -489,10 +500,15 @@ function addPanel(item) {
     const scan = eventScan(item, ev);
     const bi = scanToBase(item.rec, scan);
     const d = item.pred[bi];
+    const driver = d.reason === "relative"
+      ? (d.periodicity < 0.3 && d.valley_ratio > 0.5 ? "per+valley"
+        : d.periodicity < 0.3 ? "periodicity"
+        : "valley")
+      : d.reason;
     const ch = item.chromas ? item.chromas.map[bi] : "–";
     item.hoverEl.textContent =
       `pos ${d.pos}  ABI ${item.rec.seq[bi]}  v0.2 ${item.v02[bi]}  Chr ${ch}  ` +
-      `${d.reason}  h=${d.top_h.toFixed(0)} RFU  per=${d.periodicity.toFixed(2)}  ` +
+      `${driver}  h=${d.top_h.toFixed(0)} RFU  per=${d.periodicity.toFixed(2)}  ` +
       `valley=${d.valley_ratio.toFixed(2)}  z=${d.spike_z.toFixed(2)}`;
     if (item._drag) {
       item._drag.b = bi;
