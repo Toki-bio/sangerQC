@@ -141,10 +141,17 @@ function scanToBase(rec, scan) {
 
 function runClassify(item) {
   const c = controls();
-  const { pred, hq, island } = classifyV02(item.rec, c.alpha, c.beta);
+  const { pred, hq, island, noiseFloor, alphaRfu, stopRfu } = classifyV02(
+    item.rec,
+    c.alpha,
+    c.beta
+  );
   item.pred = pred;
   item.hq = hq;
   item.island = island;
+  item.noiseFloor = noiseFloor;
+  item.alphaRfu = alphaRfu;
+  item.stopRfu = stopRfu;
   item.v02 = v02Letters(item.rec.seq, pred);
   refreshStats(item);
 }
@@ -158,7 +165,9 @@ function refreshStats(item) {
   const st = item.stats;
   let t =
     `${rec.seq.length} ABI · v0.2 keep ${st.vKeep} · ` +
-    `HQ ${item.hq.toFixed(0)} island ${item.island[0]}–${item.island[1]}`;
+    `HQ ${item.hq.toFixed(0)} floor ${item.noiseFloor.toFixed(0)} · ` +
+    `α ${item.alphaRfu.toFixed(0)} β ${item.stopRfu.toFixed(0)} RFU · ` +
+    `island ${item.island[0]}–${item.island[1]}`;
   if (st.chKeep != null) {
     t +=
       ` · Chromas keep ${st.chKeep}` +
@@ -253,8 +262,9 @@ function drawOne(item) {
   ctx.lineWidth = 1;
   const lines = [
     [item.hq, "#555555", "HQ"],
-    [c.alpha * item.hq, "#2a9d8f", "α"],
-    [c.beta * item.hq, "#cc4444", "β"],
+    [item.alphaRfu, "#2a9d8f", "α"],
+    [item.stopRfu, "#cc4444", "β"],
+    [item.noiseFloor, "#888888", "nf"],
   ];
   const x0 = sx(scan0);
   const x1 = sx(scan1);

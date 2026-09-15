@@ -8,6 +8,35 @@
   const SPIKE_THRESH = 1.5;
   const VALLEY_THRESH = 0.5;
   const ROLL_WIN = 21;
+  const NOISE_MIN = 30;
+  const NOISE_PCT = 0.08;
+  const SNR_SPAN_ALPHA = 4;
+
+  function noiseFloor(top) {
+    if (!top.length) return NOISE_MIN;
+    const sorted = top.slice().sort((a, b) => a - b);
+    const idx = Math.floor(0.9 * (sorted.length - 1));
+    const p90 = sorted[idx];
+    return Math.max(NOISE_MIN, NOISE_PCT * p90);
+  }
+
+  function amplitudeGates(top, hq, alphaScale, betaScale) {
+    const floor = noiseFloor(top);
+    const stop = betaScale * hq;
+    const alphaHq = alphaScale * hq;
+    const headroom = Math.max(hq - floor, 0);
+    const alphaSpan = floor + alphaScale * headroom;
+    const snr = hq / Math.max(floor, 1);
+    let alpha;
+    if (snr > SNR_SPAN_ALPHA) {
+      const w = Math.min(1, (snr - SNR_SPAN_ALPHA) / 6);
+      alpha = (1 - w) * alphaHq + w * alphaSpan;
+    } else {
+      alpha = alphaHq;
+    }
+    alpha = Math.max(stop, alpha);
+    return { alphaRfu: alpha, stopRfu: stop, noiseFloor: floor };
+  }
 
   function envelopeOf(rec) {
     const n = rec.nScans;
@@ -183,6 +212,7 @@
     }
     const [a, b, w] = longestClean(v01bad);
     const hq = w ? median(top.slice(a, b + 1)) : median(top);
+    const gates = amplitudeGates(top, hq, alpha, beta);
     const level = rollingMedian(top, ROLL_WIN);
     const out = [];
     for (let i = 0; i < n; i++) {
@@ -190,10 +220,10 @@
       const spikeBad = spike[i] > SPIKE_THRESH;
       const lv = level[i];
       let bad, reason;
-      if (lv < beta * hq) {
+      if (lv < gates.stopRfu) {
         bad = true;
         reason = "below_stop_level";
-      } else if (lv < alpha * hq) {
+      } else if (lv < gates.alphaRfu) {
         bad = spikeBad;
         reason = spikeBad ? "spike" : "low_amp_keep";
       } else {
@@ -212,10 +242,19 @@
         hq_body: hq,
       });
     }
-    return { pred: out, hq, island: w ? [a + 1, b + 1] : [1, n] };
+    return {
+      pred: out,
+      hq,
+      island: w ? [a + 1, b + 1] : [1, n],
+      noiseFloor: gates.noiseFloor,
+      alphaRfu: gates.alphaRfu,
+      stopRfu: gates.stopRfu,
+    };
   }
 
   global.classifyV02 = classifyV02;
+  global.amplitudeGates = amplitudeGates;
+  global.noiseFloor = noiseFloor;
   global.PERIOD_THRESH = PERIOD_THRESH;
   global.SPIKE_THRESH = SPIKE_THRESH;
   global.VALLEY_THRESH = VALLEY_THRESH;

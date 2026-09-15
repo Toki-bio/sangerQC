@@ -1,6 +1,7 @@
 """v0.2: v0.1 plus HQ-body relative amplitude gate for long decaying reads."""
 import numpy as np
 
+from .gates import amplitude_gates, noise_floor
 from .v0_1 import (
     PERIOD_THRESH,
     SPIKE_THRESH,
@@ -49,6 +50,7 @@ def classify(ab1_path, alpha=ALPHA, beta=BETA):
     n = len(seq)
     a, b, w = longest_clean_island(v01, n)
     hq = float(np.median(top_h[a - 1:b])) if w else float(np.median(top_h))
+    alpha_rfu, stop_rfu, floor = amplitude_gates(top_h, hq, alpha, beta)
     level = rolling_median(top_h)
     spike_z = amplitude_spike_z(top_h, signed=True)
     per = periodicity(ploc, channels)
@@ -60,9 +62,9 @@ def classify(ab1_path, alpha=ALPHA, beta=BETA):
         spike_bad = spike_z[i] > SPIKE_THRESH
         lv = float(level[i])
         frac = lv / hq if hq else 0.0
-        if lv < beta * hq:
+        if lv < stop_rfu:
             bad, reason = True, "below_stop_level"
-        elif lv < alpha * hq:
+        elif lv < alpha_rfu:
             bad = bool(spike_bad)
             reason = "spike" if bad else "low_amp_keep"
         else:
@@ -78,6 +80,9 @@ def classify(ab1_path, alpha=ALPHA, beta=BETA):
             local_level=lv,
             hq_body=hq,
             level_frac=float(frac),
+            noise_floor=floor,
+            alpha_rfu=alpha_rfu,
+            stop_rfu=stop_rfu,
             v0_1_bad=bool(v01[i + 1]["bad"]),
             hq_island=(a, b),
             alpha=alpha,

@@ -21,7 +21,7 @@ streamlit run app/streamlit_app.py
 
 v0.1: periodicity (Phred-style local FFT) + oversaturation spike + valley-depth (shared-hump / G-raise), with a homopolymer exemption.
 
-v0.2: same, plus a **level gate** for the common long high-quality read whose 3′ end slowly loses amplitude. Relative metrics are skipped below α × HQ-body; the read is treated as ended below β × HQ-body. Spike uses positive z only (decay is not oversaturation). Working values after H4 calibration: α = 0.35, β = 0.18.
+v0.2: same, plus a **level gate** for the common long high-quality read whose 3′ end slowly loses amplitude. Gates are **RFU lines** per file: noise floor `max(30, 8% of p90 peak height)`, stop `max(floor, β×HQ)`, α from HQ and (on high-SNR reads) headroom above the floor. Sliders still set β and α scale (defaults 0.18 / 0.35). Relative metrics are skipped below α; spike uses positive z only.
 
 Never trim from Phred alone. Never issue a verdict by eyeballing a rendered plot.
 
