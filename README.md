@@ -6,7 +6,9 @@ The GitHub repo page is source code only — there is no upload control there.
 
 Interactive viewer:
 
-**https://toki-bio.github.io/sangerQC/docs/index.html**
+**https://toki-bio.github.io/sangerQC/**
+
+(Old link `/docs/index.html` redirects to the same viewer.)
 
 Horizontal scroll along the full read, auto vertical zoom on the visible window, Y / px-per-scan / α / β sliders, several `.ab1` files at once. The file does not leave the machine.
 

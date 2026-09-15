@@ -17,8 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Build Pages site (viewer at repo root, redirect old /docs/ URL)
+        run: |
+          mkdir -p _site/docs
+          cp -r docs/* _site/
+          cat > _site/docs/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en"><head>
+          <meta charset="utf-8" />
+          <meta http-equiv="refresh" content="0;url=../index.html" />
+          <title>sangerQC</title>
+          </head><body>
+          <p><a href="../index.html">sangerQC viewer</a></p>
+          </body></html>
+          EOF
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
