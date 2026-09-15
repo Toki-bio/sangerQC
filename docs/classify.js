@@ -4,6 +4,10 @@
  */
 (function (global) {
   const PERIOD_HALF_WIN = 60;
+  const PERIOD_HALF_WIN_LOCAL = 8;
+  const VALLEY_CLEAN_AFTER_BLOB = 0.42;
+  const VALLEY_BLOB_BEFORE = 0.45;
+  const RECOVERY_MIN_RUN = 5;
   const PERIOD_THRESH = 0.3;
   const SPIKE_THRESH = 1.5;
   const VALLEY_THRESH = 0.5;
@@ -132,7 +136,8 @@
     return total > 0 ? band / total : 0;
   }
 
-  function periodicity(rec, env) {
+  function periodicity(rec, env, halfWin) {
+    const hw = halfWin || PERIOD_HALF_WIN;
     const ploc = rec.ploc;
     const diffs = [];
     for (let i = 1; i < ploc.length; i++) diffs.push(ploc[i] - ploc[i - 1]);
@@ -140,10 +145,41 @@
     const expectedFreq = 1 / avg;
     const nScans = rec.nScans;
     return ploc.map((center) => {
-      const lo = Math.max(0, center - PERIOD_HALF_WIN);
-      const hi = Math.min(nScans, center + PERIOD_HALF_WIN);
+      const lo = Math.max(0, center - hw);
+      const hi = Math.min(nScans, center + hw);
       return periodStrength(env.subarray(lo, hi), expectedFreq);
     });
+  }
+
+  function clearPeriodSmearAfterBlob(pred, rec, env, valley, level, stopRfu) {
+    const perW = periodicity(rec, env, PERIOD_HALF_WIN);
+    const perL = periodicity(rec, env, PERIOD_HALF_WIN_LOCAL);
+    const n = pred.length;
+    let i = 1;
+    while (i < n) {
+      if (valley[i - 1] <= VALLEY_BLOB_BEFORE) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < n && valley[j] <= VALLEY_CLEAN_AFTER_BLOB && level[j] >= stopRfu) j++;
+      if (j - i >= RECOVERY_MIN_RUN) {
+        for (let k = i; k < j; k++) {
+          const p = pred[k];
+          if (
+            p.bad &&
+            p.reason === "relative" &&
+            valley[k] <= VALLEY_THRESH &&
+            perW[k] < PERIOD_THRESH &&
+            perL[k] >= PERIOD_THRESH
+          ) {
+            p.bad = false;
+            p.reason = "ok";
+          }
+        }
+      }
+      i = j > i ? j : i + 1;
+    }
   }
 
   function valleyRatio(rec, env) {
@@ -242,6 +278,7 @@
         hq_body: hq,
       });
     }
+    clearPeriodSmearAfterBlob(out, rec, env, valley, level, gates.stopRfu);
     return {
       pred: out,
       hq,

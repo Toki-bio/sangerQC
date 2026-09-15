@@ -16,6 +16,11 @@ from .v0_1 import (
 ROLL_WIN = 21
 ALPHA = 0.35
 BETA = 0.18
+PERIOD_HALF_WIN_WIDE = 60
+PERIOD_HALF_WIN_LOCAL = 8
+VALLEY_CLEAN_AFTER_BLOB = 0.42
+VALLEY_BLOB_BEFORE = 0.45
+RECOVERY_MIN_RUN = 5
 
 
 def rolling_median(x, win=ROLL_WIN):
@@ -42,6 +47,36 @@ def longest_clean_island(v01, n):
         else:
             i += 1
     return best
+
+
+def _clear_period_smear_after_blob(out, seq, ploc, channels, top_h, stop_rfu):
+    """Wide FFT periodicity can flag clean peaks still in the smear of a prior blob (A2 294+)."""
+    n = len(seq)
+    per_w = periodicity(ploc, channels, PERIOD_HALF_WIN_WIDE)
+    per_l = periodicity(ploc, channels, PERIOD_HALF_WIN_LOCAL)
+    valley = valley_ratio(seq, ploc, channels)
+    level = rolling_median(top_h)
+    i = 1
+    while i < n:
+        if valley[i - 1] <= VALLEY_BLOB_BEFORE:
+            i += 1
+            continue
+        j = i
+        while j < n and valley[j] <= VALLEY_CLEAN_AFTER_BLOB and float(level[j]) >= stop_rfu:
+            j += 1
+        if j - i >= RECOVERY_MIN_RUN:
+            for k in range(i, j):
+                p = out[k + 1]
+                if (
+                    p["bad"]
+                    and p["reason"] == "relative"
+                    and valley[k] <= VALLEY_THRESH
+                    and per_w[k] < PERIOD_THRESH
+                    and per_l[k] >= PERIOD_THRESH
+                ):
+                    p["bad"] = False
+                    p["reason"] = "ok"
+        i = j if j > i else i + 1
 
 
 def classify(ab1_path, alpha=ALPHA, beta=BETA):
@@ -88,4 +123,5 @@ def classify(ab1_path, alpha=ALPHA, beta=BETA):
             alpha=alpha,
             beta=beta,
         )
+    _clear_period_smear_after_blob(out, seq, ploc, channels, top_h, stop_rfu)
     return out, raw

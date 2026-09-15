@@ -109,6 +109,10 @@
     const out = new Array(seq.length);
     for (let i = 0; i < seq.length; i++) {
       const p = pred[i];
+      if (!p) {
+        out[i] = "N";
+        continue;
+      }
       const c = seq[i] || "N";
       if (!p || p.bad) out[i] = "N";
       else if (p.reason === "low_amp_keep") out[i] = c.toLowerCase();
