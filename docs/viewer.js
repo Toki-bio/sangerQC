@@ -2,6 +2,7 @@ const DYE = { A: "#2ca02c", C: "#1f77b4", G: "#111111", T: "#d62728" };
 
 const els = {
   file: document.getElementById("file"),
+  drop: document.getElementById("drop"),
   meta: document.getElementById("meta"),
   canvas: document.getElementById("trace"),
   start: document.getElementById("start"),
@@ -148,11 +149,10 @@ function showError(msg) {
   els.err.textContent = msg || "";
 }
 
-els.file.addEventListener("change", async (ev) => {
+async function loadFile(f) {
+  if (!f) return;
   showError("");
   rec = null;
-  const f = ev.target.files && ev.target.files[0];
-  if (!f) return;
   try {
     const buf = await f.arrayBuffer();
     rec = parseABIF(buf);
@@ -163,10 +163,32 @@ els.file.addEventListener("change", async (ev) => {
       `${f.name} · ${rec.seq.length} bases · ${rec.nScans} scans · channel order ${rec.fwo}`;
     els.start.max = rec.seq.length;
     els.start.value = 1;
+    els.canvas.hidden = false;
     draw();
   } catch (e) {
     showError(String(e.message || e));
   }
+}
+
+els.file.addEventListener("change", (ev) => {
+  loadFile(ev.target.files && ev.target.files[0]);
+});
+
+["dragenter", "dragover"].forEach((name) => {
+  els.drop.addEventListener(name, (ev) => {
+    ev.preventDefault();
+    els.drop.classList.add("drag");
+  });
+});
+["dragleave", "drop"].forEach((name) => {
+  els.drop.addEventListener(name, (ev) => {
+    ev.preventDefault();
+    els.drop.classList.remove("drag");
+  });
+});
+els.drop.addEventListener("drop", (ev) => {
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  loadFile(f);
 });
 
 ["start", "width", "alpha", "beta"].forEach((id) => {

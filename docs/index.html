@@ -10,13 +10,18 @@
   <header>
     <h1>sangerQC</h1>
     <p class="lede">
-      Drop an <code>.ab1</code>. Vertical bars sit on the called-peak scans (PLOC),
-      not a uniform time grid. Horizontal dashed lines are this read’s own
-      HQ-body amplitude thresholds (α = relative tests off, β = stop).
-      Classification still runs in the Python app; this page is the hosted viewer.
+      Vertical bars sit on the called-peak scans (PLOC), not a uniform time grid.
+      Horizontal dashed lines are this read’s own HQ-body amplitude thresholds
+      (α = relative tests off, β = stop). The file stays in the browser.
     </p>
+  </header>
+  <main>
+    <label id="drop" class="drop" for="file">
+      <input id="file" type="file" accept=".ab1,.abif" />
+      <strong>Drop an .ab1 here</strong>
+      <span>or click this box to choose a file</span>
+    </label>
     <div class="row">
-      <label>AB1 file<input id="file" type="file" accept=".ab1,.abif" /></label>
       <label>Start base<input id="start" type="number" min="1" value="1" /></label>
       <label>Window (bases)<input id="width" type="number" min="20" max="200" value="80" /></label>
       <label>α × HQ<input id="alpha" type="number" min="0.05" max="1" step="0.01" value="0.35" /></label>
@@ -24,16 +29,13 @@
     </div>
     <div id="meta"></div>
     <div id="err" hidden></div>
-  </header>
-  <main>
-    <canvas id="trace"></canvas>
+    <canvas id="trace" hidden></canvas>
     <div class="keys">
       <span class="G">G</span><span class="A">A</span><span class="T">T</span><span class="C">C</span>
     </div>
   </main>
   <footer>
     <a href="https://github.com/Toki-bio/sangerQC">github.com/Toki-bio/sangerQC</a>
-    · file stays in the browser
   </footer>
   <script src="abif.js"></script>
   <script src="viewer.js"></script>
