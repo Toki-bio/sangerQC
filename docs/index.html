@@ -10,9 +10,12 @@
   <header>
     <h1>sangerQC</h1>
     <p class="lede">
-      Scroll horizontally along the full read. Auto-Y fits the <em>visible</em> window
-      (a 5′ dye blob will not squash the body). Drag or use the sliders.
-      Several <code>.ab1</code> files can be open at once. Nothing is uploaded.
+      Letters under the trace are three rows: <strong>ABI</strong> = machine
+      PBAS (often terrible at blobs / mixed peaks), <strong>v0.2</strong> =
+      those same letters with N where the classifier rejects (not a new
+      caller), <strong>Chr</strong> = Chromas/edited FASTA if you drop one.
+      Left scale is RFU. Overlay: red = relative-bad, teal = low-amp keep,
+      purple = stop, orange = spike. Nothing is uploaded.
     </p>
     <div class="toolbar">
       <label>px / scan
@@ -24,6 +27,8 @@
         <output id="yOut">1.00×</output>
       </label>
       <label class="check"><input id="autoY" type="checkbox" checked /> auto vertical zoom</label>
+      <label class="check"><input id="overlay" type="checkbox" checked /> v0.2 overlay</label>
+      <label class="check"><input id="lock" type="checkbox" /> lock scroll</label>
       <label>α × HQ
         <input id="alpha" type="range" min="0.05" max="1" step="0.01" value="0.35" />
         <output id="alphaOut">0.35</output>
@@ -32,17 +37,18 @@
         <input id="beta" type="range" min="0.01" max="0.8" step="0.01" value="0.18" />
         <output id="betaOut">0.18</output>
       </label>
+      <button type="button" id="exportLabels">export labels JSON</button>
     </div>
     <div class="keys">
       <span class="G">G</span><span class="A">A</span><span class="T">T</span><span class="C">C</span>
-      <span class="hint">wheel = horizontal scroll · ctrl+wheel = Y zoom · shift+wheel = px/scan</span>
+      <span class="hint">drag = label zone · wheel = pan · ctrl+wheel = Y · shift+wheel = px/scan</span>
     </div>
   </header>
   <main>
     <label id="drop" class="drop">
-      <input id="file" type="file" accept=".ab1,.abif" multiple />
-      <strong>Drop .ab1 files here</strong>
-      <span>or click to choose — several at once is fine</span>
+      <input id="file" type="file" accept=".ab1,.abif,.fa,.fasta,.fas,.seq" multiple />
+      <strong>Drop .ab1 plus Chromas FASTA</strong>
+      <span>ab1 first, or together — FASTA is aligned onto the same PLOC</span>
     </label>
     <div id="err" hidden></div>
     <div id="panels"></div>
@@ -50,7 +56,21 @@
   <footer>
     <a href="https://github.com/Toki-bio/sangerQC">github.com/Toki-bio/sangerQC</a>
   </footer>
+  <dialog id="labelDlg">
+    <form method="dialog">
+      <p id="dlgRange"></p>
+      <label>class
+        <select id="dlgClass"></select>
+      </label>
+      <menu>
+        <button type="submit" value="cancel">cancel</button>
+        <button type="submit" id="dlgOk" value="ok">save M1 label</button>
+      </menu>
+    </form>
+  </dialog>
   <script src="abif.js"></script>
+  <script src="classify.js"></script>
+  <script src="compare.js"></script>
   <script src="viewer.js"></script>
 </body>
 </html>

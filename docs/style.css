@@ -84,19 +84,43 @@ h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
   font-size: 13px;
 }
 .panel-bar .name { font-weight: 600; }
-.panel-bar .meta { color: var(--muted); }
+.panel-bar .meta { color: var(--muted); flex: 1 1 240px; }
+.panel-bar .hover { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
 .panel-bar button {
-  margin-left: auto;
   font: inherit;
   background: transparent;
   border: 1px solid var(--line);
   padding: 2px 8px;
   cursor: pointer;
 }
+.panel-bar button.close { margin-left: auto; }
+.toolbar button {
+  font: inherit;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  cursor: pointer;
+  align-self: end;
+}
+.labellist {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.labellist li { display: flex; gap: 10px; align-items: center; }
+.labellist button { font: inherit; cursor: pointer; }
+dialog {
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: #fff;
+}
+dialog menu { display: flex; gap: 8px; justify-content: end; padding: 12px 0 0; }
 .viewport {
   overflow-x: auto;
   overflow-y: hidden;
-  height: 280px;
+  height: 310px;
   background: #fff;
 }
 .viewport canvas { display: block; }
