@@ -4,7 +4,21 @@ from Bio import SeqIO
 
 PERIOD_HALF_WIN = 60
 PERIOD_THRESH = 0.3
-SPIKE_THRESH = 1.5
+# 1.5 was miscalibrated: on a normal, healthy read the log-height distribution
+# is tight (e.g. C1: log1p(top_h).std() = 0.43), so z=1.5 there is only ~1.9x
+# the geometric mean - ordinary peak-to-peak variation, not an artifact. With
+# ~287 positions and a roughly-normal distribution you'd *expect* ~9% of
+# points to clear z=1.5 by chance alone; confirmed this was flagging healthy,
+# well-resolved single peaks as spikes (Artemia C1, positions 70/108/111/118/
+# 182, all clean G calls with periodicity 0.63-0.78 and valley 0.04-0.08).
+# Genuine oversaturation artifacts sit far clear of any reasonable threshold
+# in this range: Artemia G4 positions 45-48 (the confirmed 10-40x-normal
+# saturation spike) score z=4.08-4.57. Raised to 2.0, which is empirically
+# clean on both ends: zero false positives on C1 (max z there is 0.0 among
+# genuinely-tall positions... i.e. nothing clears 2.0), full margin preserved
+# on G4's and B3's real spikes (B3's known early-read saturation cluster,
+# positions ~34-70, scores 2.24-4.2, still comfortably caught).
+SPIKE_THRESH = 2.0
 VALLEY_THRESH = 0.5
 
 
