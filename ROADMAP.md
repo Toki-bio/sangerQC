@@ -46,7 +46,7 @@ Known members (add, do not collapse):
 | `spill_secondary` | Second channel in the slot is a neighbour's tail (no own apex, or apex > 0.35 spacing off) | v0.3 co-location; not a mixed base |
 | `colocated_secondary` | Second channel has its own apex on the called peak | v0.3 → IUPAC ≥ 0.33; meaning is Layer 3 in SECONDARY_PEAKS.md |
 | `pullup` | Co-located second inside a saturated zone | `near_sat`; keep machine letter |
-| `het_indel_shift` | Double peaks from one point to the end; second track = first shifted by k | HET_INDEL.md (planned) |
+| `het_indel_shift` | Double peaks from one point to the end; second track = first shifted by k | hetindel.py prototype; HET_INDEL.md |
 
 Layer B is where sinusoid / Fourier / slow-envelope models belong. Layer A is what remains after Layer B is subtracted. Mixing them produced the H4 failure: periodicity (Layer B, timing) firing on slow decay (Layer B, amplitude) plus stochastic relative wobble (Layer A).
 
