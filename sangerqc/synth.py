@@ -53,11 +53,23 @@ def allele_b(channels, ploc, pos, k):
     return out
 
 
-def make_het_indel(ab1_in, ab1_out, pos, k, weight_a=0.5):
+def make_het_indel(ab1_in, ab1_out, pos, k, weight_a=0.5, noise=0.0, jitter=0.0, seed=0):
+    """noise: white noise SD as a fraction of the median called-peak height, added per scan.
+    jitter: SD of a log-normal per-peak scale applied to allele B only, so the two alleles'
+    peak heights stop being copies of each other (real alleles differ by context and PCR)."""
+    rng = np.random.default_rng(seed)
     raw = load_ab1(ab1_in)
     ch, ploc, seq = raw["channels"], raw["ploc"], raw["seq"]
     b = allele_b(ch, ploc, pos, k)
+    if jitter > 0:
+        n_scans = len(ch["A"])
+        f = np.exp(rng.normal(0, jitter, len(ploc)))
+        scale = np.interp(np.arange(n_scans), ploc, f)
+        b = {x: b[x] * scale for x in "ACGT"}
     mixed = {x: weight_a * ch[x].astype(float) + (1 - weight_a) * b[x] for x in "ACGT"}
+    if noise > 0:
+        sd = noise * float(np.median(raw["top_h"]))
+        mixed = {x: np.clip(mixed[x] + rng.normal(0, sd, len(mixed[x])), 0, None) for x in "ACGT"}
     buf = bytearray(open(ab1_in, "rb").read())
     ent = _abif_entries(bytes(buf))
     order = raw["base_order"]
@@ -71,4 +83,4 @@ def make_het_indel(ab1_in, ab1_out, pos, k, weight_a=0.5):
     a_seq = seq
     n = len(seq)
     b_seq = seq[:pos - 1] + "".join(seq[i + k] if 0 <= i + k < n else "" for i in range(pos - 1, n))
-    return dict(pos=pos, k=k, weight_a=weight_a, allele_a=a_seq, allele_b=b_seq)
+    return dict(pos=pos, k=k, weight_a=weight_a, noise=noise, jitter=jitter, allele_a=a_seq, allele_b=b_seq)

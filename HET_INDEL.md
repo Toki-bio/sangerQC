@@ -18,6 +18,21 @@ false second base into that set; in the Thermocyclops reads ~80 % of ratio ≥ 0
 were spill. sangerQC's co-location test (secondary.py) removes them, so it is a better front end
 for any of these decoders, including ours.
 
+## What was taken from each, after reading the sources (2026-10-06)
+
+No code was copied (Tracy is BSD-3, sangerseqR GPL-2); the ideas below were re-implemented.
+
+| source | read | idea taken | where |
+|---|---|---|---|
+| Tracy `src/decompose.h` (`findBreakpoint`, `decomposeAlleles`) | full source | breakpoint from a **continuous** mixing signal, step between two 25-call windows; reference-guided scan of deletion *and* insertion lengths counting calls the reference cannot explain; size chosen by a **median − MAD** cut-off, smallest size first; allele fraction from peak heights | `onset_continuous`, `solve_reference`, `size_call`, `allele_fraction` |
+| sangerseqR `makeBaseCalls`, `getpeaks`, `setAllelePhase` (Poly Peak Parser's engine) | full source | confirms the slot (midpoint) window, true local maxima with plateau handling, the 0.33 ratio; phasing = reference base to one allele, remainder to the other | same conventions in secondary.py; reference mode |
+| Indelligent paper (Dmitriev & Rakitov 2008; full text via Europe PMC — the web site and its source no longer respond) | methods section | **large shifts fit by chance** (few overlapping calls), so prefer the smallest adequate shift; SNPs between alleles and several indels handled by DP over per-site phase shifts | smallest-size rule in `size_call`; multi-indel DP **not** implemented |
+
+Two further fixes came from the harder benchmark, not from the sources: at most **two bases per
+call** (a two-allele mixture cannot have more), and a **per-read floor** for counting a secondary,
+taken from the clean stretch before the onset (noise there otherwise makes 59 % of calls "double"
+and lets a wrong large shift win).
+
 ## Model used here (`sangerqc/hetindel.py`)
 
 `S_i` = bases with a peak on call i (primary + co-located secondaries ≥ 0.20).
@@ -49,24 +64,37 @@ Results: see "Benchmark" below.
 
 ## Benchmark
 
-2026-10-06, 84 synthetic cases from three clean Artemia reads (C1 calls 67–271, A2 66–285,
-A3 200–410), indel at 40 % of the zone:
+`validation/bench_hetindel.py`, 2026-10-06: synthetic indels at 40 % of the clean zone of three
+Artemia reads (C1 calls 67–271, A2 66–285, A3 200–410); d = 1, 2, 3, 5, 8, 13, 21 as deletion and
+duplication; 42 cases per condition. "Correct" = indel called **and** size right (reference mode:
+size and deletion/insertion right; Tracy: size right and `hetindel` flag set).
 
-| read | type | w (allele A) | size correct (ours) | allele accuracy mean / min (ours) | size correct (Tracy) |
-|---|---|---|---|---|---|
-| C1 | deletion | 0.5 / 0.3 | 7/7, 7/7 | 0.981 / 0.966, 0.985 / 0.958 | 7/7, 7/7 |
-| C1 | duplication | 0.5 / 0.3 | 7/7, 7/7 | 0.982 / 0.966, 0.948 / 0.912 | 7/7, 7/7 |
-| A2 | deletion | 0.5 / 0.3 | 7/7, 7/7 | 0.979 / 0.938, 0.972 / 0.930 | 7/7, 7/7 |
-| A2 | duplication | 0.5 / 0.3 | 7/7, 7/7 | 0.981 / 0.938, 0.930 / 0.829 | 7/7, 7/7 |
-| A3 | deletion | 0.5 / 0.3 | 7/7, 7/7 | 0.924 / 0.885, 0.942 / 0.858 | 7/7, 7/7 |
-| A3 | duplication | 0.5 / 0.3 | 7/7, 7/7 | 0.926 / 0.868, 0.918 / 0.888 | 7/7, 7/7 |
+| condition (allele A share, noise, jitter) | reference-free, first version | reference-free, final | reference-guided, final | Tracy decompose |
+|---|---|---|---|---|
+| 50 %, none | 42 | 42 | 42 | 42 |
+| 30 %, none | 42 | 42 | 42 | 42 |
+| 20 %, none | 32 | 41 | 42 | 22 |
+| 50 %, noise 0.1, jitter 0.3 | **0** | 42 | 42 | 42 |
+| 30 %, noise 0.1, jitter 0.3 | **1** | 42 | 42 | 42 |
+| **total / 210** | 117 | 209 | 210 | 190 |
 
-Both find the indel size in 84/84: the synthetic set is too easy to separate the methods on size.
-Allele accuracy (ours) is per call from the onset to the end of the clean zone, against the
-known A and B; truth A is the source read's own calls, so its residual miscalls cap the score
-(A3 is the noisiest source). Tracy's alleles come out in its own re-basecalled coordinates, so
-only its size call is scored here. The onset is "exact" in 32/84; the rest sit a few calls away
-inside repeats where the indel position is not unique, which does not affect the alleles.
+Allele-sequence accuracy (final): reference-guided 0.992–1.000 per condition; reference-free
+0.83–0.97 (lowest with noise and a 30 % allele). Through the automatic entry point
+`decode_read()` (span chosen by the read's own flags, no hand-given range): 209/210 and 210/210.
+
+Negatives (must return "no indel"): Thermocyclops F2 and G2 (a block of double peaks that ends
+again), and Artemia C1, A2, A3, B3, G4, H4: **0/8 called**. The first final run called H4 a 1-bp
+indel at call 807 — inside H4's BLAST-confirmed degraded tail; `decode_read` now stays inside the
+unflagged span and the call disappears.
+
+What changed between "first version" and "final": two bases per call at most; per-read floor for
+secondaries tried alongside the plain 0.20 floor (keep the more significant answer — the floor
+alone cost weak 20 % alleles); continuous breakpoint signal with a persistence check; size chosen
+by the median − MAD rule with the smallest adequate size; decoding only inside the unflagged span.
+
+Limits of this test: one indel per read, no SNPs between the alleles, both alleles cut from the
+same real trace, white noise. It shows the logic works and where it breaks; it is not evidence on
+real heterozygotes.
 
 ## What real data is needed next
 
