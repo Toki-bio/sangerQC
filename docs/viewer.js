@@ -6,6 +6,7 @@ const REASON_FILL = {
   relative: "rgba(204,68,68,0.20)",
   spike: "rgba(230,140,20,0.22)",
   low_amp_keep: "rgba(42,157,143,0.20)",
+  low_amp_5prime: "rgba(160,80,20,0.18)",
   below_stop_level: "rgba(90,40,90,0.24)",
 };
 const CLASS_FILL = {
@@ -141,7 +142,7 @@ function scanToBase(rec, scan) {
 
 function runClassify(item) {
   const c = controls();
-  const { pred, hq, island, noiseFloor, alphaRfu, stopRfu } = classifyV02(
+  const { pred, hq, island, noiseFloor, alphaRfu, stopRfu, lowSnr } = classifyV03(
     item.rec,
     c.alpha,
     c.beta
@@ -152,6 +153,7 @@ function runClassify(item) {
   item.noiseFloor = noiseFloor;
   item.alphaRfu = alphaRfu;
   item.stopRfu = stopRfu;
+  item.lowSnr = lowSnr;
   item.v02 = v02Letters(item.rec.seq, pred);
   refreshStats(item);
 }
@@ -164,7 +166,8 @@ function refreshStats(item) {
   const rec = item.rec;
   const st = item.stats;
   let t =
-    `${rec.seq.length} ABI · v0.2 keep ${st.vKeep} · ` +
+    `${rec.seq.length} ABI · v0.3 keep ${st.vKeep} · ` +
+    (item.lowSnr ? "LOW SNR (HQ < 2× floor: α/β gates not meaningful) · " : "") +
     `HQ ${item.hq.toFixed(0)} floor ${item.noiseFloor.toFixed(0)} · ` +
     `α ${item.alphaRfu.toFixed(0)} β ${item.stopRfu.toFixed(0)} RFU · ` +
     `island ${item.island[0]}–${item.island[1]}`;
@@ -295,6 +298,29 @@ function drawOne(item) {
     ctx.stroke();
   }
 
+  // co-located secondary peaks: a triangle in the second base's dye colour at the
+  // second channel's apex height (filled = called IUPAC, hollow = below 0.33 or saturated zone)
+  if (item.pred && showBars) {
+    for (let i = 0; i < rec.ploc.length; i++) {
+      const s = item.pred[i].sec;
+      if (!s || (s.cls !== "colocated" && s.cls !== "near_sat")) continue;
+      const sc = rec.ploc[i];
+      if (sc < scan0 || sc > scan1) continue;
+      const x = sx(sc + (s.offset || 0) * spacing);
+      const y = sy(rec.channels[s.secondary][Math.round(sc + (s.offset || 0) * spacing)] || 0);
+      ctx.beginPath();
+      ctx.moveTo(x, y - 9);
+      ctx.lineTo(x - 4, y - 16);
+      ctx.lineTo(x + 4, y - 16);
+      ctx.closePath();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = DYE[s.secondary];
+      ctx.fillStyle = DYE[s.secondary];
+      if (s.cls === "colocated" && s.iupac) ctx.fill();
+      ctx.stroke();
+    }
+  }
+
   ctx.font = "10px ui-monospace, Consolas, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -309,7 +335,7 @@ function drawOne(item) {
 
   const rows = [
     { label: "ABI≠", letters: rec.seq, kind: "abi" },
-    { label: "v0.2", letters: item.v02, kind: "v02" },
+    { label: "v0.3", letters: item.v02, kind: "v02" },
   ];
   if (item.chromas) rows.push({ label: "Chr", letters: item.chromas.map, kind: "chr" });
 
@@ -516,10 +542,15 @@ function addPanel(item) {
         : "valley")
       : d.reason;
     const ch = item.chromas ? item.chromas.map[bi] : "–";
+    const s = d.sec;
+    const secTxt = s && s.cls !== "none"
+      ? `  2nd ${s.secondary} ${s.ratio.toFixed(2)} ${s.cls}` +
+        (s.offset === null ? " (no apex)" : ` off ${s.offset >= 0 ? "+" : ""}${s.offset.toFixed(2)}`)
+      : "";
     item.hoverEl.textContent =
-      `pos ${d.pos}  ABI ${item.rec.seq[bi]}  v0.2 ${item.v02[bi]}  Chr ${ch}  ` +
+      `pos ${d.pos}  ABI ${item.rec.seq[bi]}  v0.3 ${item.v02[bi]}  Chr ${ch}  ` +
       `${driver}  h=${d.top_h.toFixed(0)} RFU  per=${d.periodicity.toFixed(2)}  ` +
-      `valley=${d.valley_ratio.toFixed(2)}  z=${d.spike_z.toFixed(2)}`;
+      `valley=${d.valley_ratio.toFixed(2)}  z=${d.spike_z.toFixed(2)}` + secTxt;
     if (item._drag) {
       item._drag.b = bi;
       drawOne(item);

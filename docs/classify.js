@@ -1,6 +1,8 @@
 /**
- * v0.2 classifier in the browser — same rules as sangerqc/v0_2.py.
- * Periodicity (local FFT), valley-depth, positive spike z, then α/β HQ-body gate.
+ * Classifier in the browser — same rules as sangerqc/v0_2.py and sangerqc/v0_3.py.
+ * v0.2: periodicity (local FFT), valley-depth, positive spike z, then α/β HQ-body gate.
+ * v0.3 (classifyV03): same bad/ok flags, plus all-reasons, spike-over-relative label,
+ * low_amp_5prime caution label, and the secondary-peak co-location test (secondary.py).
  */
 (function (global) {
   const PERIOD_HALF_WIN = 60;
@@ -9,7 +11,7 @@
   const VALLEY_BLOB_BEFORE = 0.45;
   const RECOVERY_MIN_RUN = 5;
   const PERIOD_THRESH = 0.3;
-  const SPIKE_THRESH = 1.5;
+  const SPIKE_THRESH = 2.0; // synced with sangerqc/v0_1.py (commit e427690)
   const VALLEY_THRESH = 0.5;
   const ROLL_WIN = 21;
   const NOISE_MIN = 30;
@@ -289,7 +291,123 @@
     };
   }
 
+  // ---- v0.3: secondary peaks (port of sangerqc/secondary.py) ----
+  const SEC_RATIO_MIN = 0.2;
+  const SEC_RATIO_CALL = 0.33;
+  const SEC_COLOC_MAX = 0.35;
+  const SAT_X_HQ = 3.0;
+  const SAT_WINDOW = 10;
+  const IUPAC2 = { AG: "R", CT: "Y", CG: "S", AT: "W", GT: "K", AC: "M" };
+  const iupacOf = (a, b) => IUPAC2[[a, b].sort().join("")];
+
+  /** Highest interior local maximum of ch within [L, R] (plateaus count only if they then fall); -1 if none. */
+  function interiorApex(ch, L, R) {
+    let best = -1, bv = -Infinity;
+    let k = L + 1;
+    while (k < R) {
+      if (ch[k] - ch[k - 1] > 0) {
+        let j = k;
+        while (j < R && ch[j + 1] - ch[j] === 0) j++;
+        if (j < R && ch[j + 1] - ch[j] < 0) {
+          const mid = (k + j) >> 1;
+          if (ch[mid] > bv) { bv = ch[mid]; best = mid; }
+        }
+        k = j + 1;
+      } else k++;
+    }
+    return best;
+  }
+
+  function channelProbe(rec, i) {
+    const ploc = rec.ploc, n = ploc.length, nScans = rec.nScans;
+    const L = i > 0 ? Math.floor((ploc[i - 1] + ploc[i]) / 2) : Math.max(0, ploc[i] - 6);
+    const R = i < n - 1 ? Math.floor((ploc[i] + ploc[i + 1]) / 2) : Math.min(nScans - 1, ploc[i] + 6);
+    let sp;
+    if (i > 0 && i < n - 1) sp = (ploc[i + 1] - ploc[i - 1]) / 2;
+    else if (n > 1) sp = (ploc[n - 1] - ploc[0]) / (n - 1);
+    else sp = 12;
+    sp = Math.max(sp, 1);
+    const h = {};
+    for (const b of "ACGT") {
+      const ch = rec.channels[b];
+      let m = -Infinity;
+      for (let s = L; s <= R; s++) if (ch[s] > m) m = ch[s];
+      h[b] = m;
+    }
+    let primary = "A";
+    for (const b of "CGT") if (h[b] > h[primary]) primary = b;
+    const top = h[primary];
+    const channels = {};
+    for (const b of "ACGT") {
+      const ch = rec.channels[b];
+      const k = interiorApex(ch, L, R);
+      if (k < 0) channels[b] = { height: h[b], ratio: top ? h[b] / top : 0, apex: false, offset: null };
+      else channels[b] = { height: ch[k], ratio: top ? ch[k] / top : 0, apex: true, offset: (k - ploc[i]) / sp };
+    }
+    return { primary, top, channels };
+  }
+
+  function isColocated(c) {
+    return c.apex && c.offset !== null && Math.abs(c.offset) <= SEC_COLOC_MAX && c.ratio >= SEC_RATIO_MIN;
+  }
+
+  function secondaryPeaks(rec, top, hq) {
+    const n = rec.seq.length;
+    const zone = new Uint8Array(n);
+    for (let k = 0; k < n; k++) {
+      if (top[k] >= SAT_X_HQ * hq) {
+        for (let j = Math.max(0, k - SAT_WINDOW); j <= Math.min(n - 1, k + SAT_WINDOW); j++) zone[j] = 1;
+      }
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const p = channelProbe(rec, i);
+      const others = "ACGT".split("").filter((b) => b !== p.primary);
+      let sec = others.reduce((a, b) => (p.channels[b].height > p.channels[a].height ? b : a));
+      const ratioSlot = p.top ? p.channels[sec].height / p.top : 0;
+      const coloc = others.filter((b) => isColocated(p.channels[b]));
+      let cls;
+      if (coloc.length) {
+        sec = coloc.reduce((a, b) => (p.channels[b].ratio > p.channels[a].ratio ? b : a));
+        cls = zone[i] ? "near_sat" : "colocated";
+      } else cls = ratioSlot < SEC_RATIO_MIN ? "none" : "spill";
+      const c = p.channels[sec];
+      out.push({
+        primary: p.primary, secondary: sec, ratio: c.ratio, offset: c.offset, apex: c.apex, cls,
+        iupac: cls === "colocated" && c.ratio >= SEC_RATIO_CALL ? iupacOf(p.primary, sec) : null,
+      });
+    }
+    return out;
+  }
+
+  function classifyV03(rec, alpha, beta) {
+    const res = classifyV02(rec, alpha, beta);
+    const level = rollingMedian(topH(rec), ROLL_WIN);
+    let lead = level.length;
+    for (let i = 0; i < level.length; i++) if (level[i] >= res.alphaRfu) { lead = i; break; }
+    const sec = secondaryPeaks(rec, topH(rec), res.hq);
+    res.pred.forEach((p, i) => {
+      const reasons = [];
+      if (p.local_level < res.stopRfu) reasons.push("below_stop_level");
+      else if (p.local_level < res.alphaRfu) reasons.push("low_amp");
+      if (p.periodicity < PERIOD_THRESH) reasons.push("periodicity");
+      if (p.valley_ratio > VALLEY_THRESH) reasons.push("valley");
+      if (p.spike_z > SPIKE_THRESH) reasons.push("spike");
+      p.reasons = reasons;
+      p.v02_reason = p.reason;
+      if (p.bad && p.reason === "relative" && reasons.includes("spike")) p.reason = "spike";
+      if (p.reason === "low_amp_keep" && i < lead) p.reason = "low_amp_5prime";
+      p.sec = sec[i];
+    });
+    const hqTop = res.hq;
+    res.lowSnr = hqTop < 2 * res.noiseFloor;
+    res.leadLowAmpEnd = lead;
+    return res;
+  }
+
   global.classifyV02 = classifyV02;
+  global.classifyV03 = classifyV03;
+  global.secondaryPeaks = secondaryPeaks;
   global.amplitudeGates = amplitudeGates;
   global.noiseFloor = noiseFloor;
   global.PERIOD_THRESH = PERIOD_THRESH;

@@ -11,12 +11,16 @@
     <h1>sangerQC</h1>
     <p class="lede">
       Letters use dye colours (G black, A green, T red, C blue).
-      <strong>v0.2</strong> is the masked sequence (N = rejected, not a new
-      caller). <strong>ABI≠</strong> shows the machine letter only where it
+      <strong>v0.3</strong> is the masked sequence (N = rejected) with
+      secondary peaks resolved: IUPAC only where the second channel has its own
+      apex on the called peak (≥ 0.33; triangle in that base’s dye colour,
+      hollow = weaker or in a saturated zone); a machine IUPAC whose second
+      channel is a neighbour’s tail becomes the primary base.
+      <strong>ABI≠</strong> shows the machine letter only where it
       differs. <strong>Chr</strong> is a dropped Chromas FASTA.
       Left scale is RFU. α/β sliders scale gates vs HQ and this file’s noise
       floor (max(30, 8% of p90 peak height)). Gray nf = floor. Overlay: red =
-      relative-bad, teal = low-amp keep,
+      relative-bad, teal = low-amp keep, brown = low-amp 5′ start (real or junk: check a reference),
       purple = stop, orange = spike. Nothing is uploaded.
     </p>
     <div class="toolbar">
@@ -29,7 +33,7 @@
         <output id="yOut">1.00×</output>
       </label>
       <label class="check"><input id="autoY" type="checkbox" checked /> auto vertical zoom</label>
-      <label class="check"><input id="overlay" type="checkbox" checked /> v0.2 overlay</label>
+      <label class="check"><input id="overlay" type="checkbox" checked /> v0.3 overlay</label>
       <label class="check"><input id="lock" type="checkbox" /> lock scroll</label>
       <label>α × HQ
         <input id="alpha" type="range" min="0.05" max="1" step="0.01" value="0.35" />
@@ -70,9 +74,9 @@
       </menu>
     </form>
   </dialog>
-  <script src="abif.js?v=8"></script>
-  <script src="classify.js?v=8"></script>
-  <script src="compare.js?v=8"></script>
-  <script src="viewer.js?v=8"></script>
+  <script src="abif.js?v=9"></script>
+  <script src="classify.js?v=9"></script>
+  <script src="compare.js?v=9"></script>
+  <script src="viewer.js?v=9"></script>
 </body>
 </html>

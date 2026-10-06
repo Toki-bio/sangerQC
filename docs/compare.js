@@ -105,18 +105,29 @@
     return fwd;
   }
 
+  /**
+   * Viewer letters (v0.3 rules, see sangerqc/export.py): N = rejected (bad);
+   * IUPAC where the second channel has its own apex on the called peak (ratio >= 0.33);
+   * the primary base where the caller printed IUPAC but the second channel is a
+   * neighbour's tail; caller letter, lowercase, inside saturated zones and low-amp runs.
+   */
   function v02Letters(seq, pred) {
+    const IU = "RYSWKMBDHVN";
     const out = new Array(seq.length);
     for (let i = 0; i < seq.length; i++) {
       const p = pred[i];
-      if (!p) {
+      if (!p || p.bad) {
         out[i] = "N";
         continue;
       }
-      const c = seq[i] || "N";
-      if (!p || p.bad) out[i] = "N";
-      else if (p.reason === "low_amp_keep") out[i] = c.toLowerCase();
-      else out[i] = c;
+      const c = (seq[i] || "N").toUpperCase();
+      const s = p.sec;
+      let l = c;
+      if (s && s.cls === "colocated" && s.iupac) l = s.iupac;
+      else if (s && s.cls === "near_sat") l = c.toLowerCase();
+      else if (s && IU.includes(c) && c !== "N") l = s.primary;
+      if (p.reason === "low_amp_keep" || p.reason === "low_amp_5prime") l = l.toLowerCase();
+      out[i] = l;
     }
     return out;
   }

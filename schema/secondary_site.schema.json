@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sangerQC secondary-peak site record",
+  "description": "One reference coordinate seen across one or more reads. See SECONDARY_PEAKS.md.",
+  "type": "object",
+  "required": ["ref_id", "ref_pos", "states", "reads", "evidence", "interpretation", "sangerqc_version", "params", "annotator", "date"],
+  "properties": {
+    "ref_id": { "type": "string" },
+    "ref_pos": { "type": "integer", "minimum": 1 },
+    "states": { "type": "array", "items": { "type": "string", "enum": ["A", "C", "G", "T", "-"] }, "minItems": 1 },
+    "iupac": { "type": "string", "pattern": "^[ACGTRYSWKMBDHVN-]$" },
+    "reads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["read", "pos", "sec_class"],
+        "properties": {
+          "read": { "type": "string" },
+          "file_md5": { "type": "string" },
+          "specimen": { "type": "string" },
+          "primer": { "type": "string" },
+          "strand": { "type": "string", "enum": ["+", "-"] },
+          "pos": { "type": "integer", "minimum": 1 },
+          "caller": { "type": "string" },
+          "dominant": { "type": "string" },
+          "ratio": { "type": "number", "minimum": 0 },
+          "apex_offset": { "type": ["number", "null"] },
+          "local_level": { "type": "number" },
+          "sec_class": { "type": "string", "enum": ["none", "spill", "colocated", "near_sat"] },
+          "control_pass_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "n_reads_with": { "type": "integer", "minimum": 0 },
+    "n_reads_covering": { "type": "integer", "minimum": 0 },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["FR", "RR", "DP", "DM", "DS", "CLONE", "NGS", "REF", "MANUAL"] }
+    },
+    "interpretation": {
+      "type": "string",
+      "enum": [
+        "heterozygous_snp",
+        "intragenomic_variant",
+        "heteroplasmy",
+        "mixed_template",
+        "het_indel_phase_shift",
+        "artifact_pullup",
+        "artifact_dye_blob",
+        "artifact_compression",
+        "unresolved"
+      ]
+    },
+    "sangerqc_version": { "type": "string" },
+    "params": {
+      "type": "object",
+      "properties": {
+        "ratio_min": { "type": "number" },
+        "ratio_call": { "type": "number" },
+        "colocate_max": { "type": "number" }
+      }
+    },
+    "annotator": { "type": "string" },
+    "date": { "type": "string", "format": "date" },
+    "notes": { "type": "string" }
+  }
+}
