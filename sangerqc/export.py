@@ -16,7 +16,8 @@ MIN_CLEAN_RUN = 10
 IUPAC_LETTERS = set("RYSWKMBDHVN")
 
 FIELDS = ["pos", "scan", "caller", "phred", "out", "decision", "bad", "reason", "reasons", "local_level",
-          "primary", "secondary", "ratio", "apex", "offset", "sec_class", "lbf", "concordance",
+          "primary", "secondary", "ratio", "apex", "offset", "sec_class", "lbf", "p_mixed", "gt", "gq", "pl",
+          "concordance",
           "h_A", "h_C", "h_G", "h_T", "off_A", "off_C", "off_G", "off_T"]
 
 
@@ -102,7 +103,8 @@ def to_sequence(pred, raw, reproduced=None, min_clean_run=MIN_CLEAN_RUN, ref_sta
                 decision=decision, bad=p["bad"], reason=p["reason"], reasons="+".join(p.get("reasons", [])),
                 local_level=round(p["local_level"]), primary=s["primary"], secondary=s["secondary"],
                 ratio=s["ratio"], apex=s["apex"], offset=s["offset"], sec_class=s["cls"],
-                lbf=p.get("lbf", ""), concordance="reproduced" if i in reproduced else "",
+                lbf=p.get("lbf", ""), p_mixed=p.get("p_mixed", ""), gt=p.get("gt", ""), gq=p.get("gq", ""),
+                pl=p.get("pl", ""), concordance="reproduced" if i in reproduced else "",
             )
             for b in "ACGT":
                 row[f"h_{b}"] = round(chans[b]["height"])

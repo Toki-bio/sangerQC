@@ -143,3 +143,84 @@ def score_read(raw, null_positions=None, alt=None, prior=0.05):
         lbf = log10_bf(o, m)
         out.append((lbf, posterior(lbf, prior)))
     return out, m, obs
+
+
+def adapt_alt(obs_list, m: Model, n0=30.0, iters=30, prior0=0.05):
+    """Per-read H1 by self-training (EM) with shrinkage toward the global H1 held in `m`.
+
+    H0 in `m` stays fixed (fitted from the read's own single-base stretch). Each position gets a
+    responsibility r_i = P(two bases | data); H1's parameters are re-estimated from the
+    r-weighted observations, with `n0` pseudo-observations pulling them back to the global
+    values, so a read with no real double positions keeps the global H1 instead of drifting
+    onto the tail of H0. Returns (adapted Model, pi), pi = fraction of calls with two bases.
+    """
+    base = m
+    cur = Model(**m.to_dict())
+    pi = prior0
+    for _ in range(iters):
+        r = []
+        for o in obs_list:
+            lbf = (loglik(o, cur, 1) - loglik(o, cur, 0))
+            z = lbf + math.log(pi / (1 - pi))
+            r.append(1.0 / (1.0 + math.exp(-max(min(z, 50), -50))))
+        r = np.array(r)
+        seen = [(i, o) for i, o in enumerate(obs_list) if o is not None]
+        w_all = r.sum()
+        w_seen = np.array([r[i] for i, _ in seen])
+        lx = np.array([math.log(o[0]) for _, o in seen])
+        offs = np.array([o[1] for _, o in seen])
+        W = w_seen.sum()
+        cur.q1 = float(min(max((n0 * base.q1 + (w_all - W)) / (n0 + w_all), 1e-3), 0.9))
+        cur.mu1 = float((n0 * base.mu1 + np.sum(w_seen * lx)) / (n0 + W))
+        var = (n0 * (base.s1 ** 2) + np.sum(w_seen * (lx - cur.mu1) ** 2)) / (n0 + W)
+        cur.s1 = float(max(math.sqrt(var), 0.2))
+        h = np.array([(1 - cur.eo) * math.exp(_halfnorm_trunc(o, cur.so)) /
+                      ((1 - cur.eo) * math.exp(_halfnorm_trunc(o, cur.so)) + cur.eo / COLOCATE_MAX) for o in offs])
+        cur.so = float(max(math.sqrt((n0 * base.so ** 2 + np.sum(w_seen * h * offs ** 2)) /
+                                      (n0 + np.sum(w_seen * h))), 0.02))
+        cur.eo = float(min(max((n0 * base.eo + np.sum(w_seen * (1 - h))) / (n0 + W), 0.0), 0.9))
+        pi = float(min(max(r.mean(), 1e-3), 0.9))
+    return cur, pi
+
+
+# ---- genotype probabilities and Phred likelihoods (the Clair3 output convention) --------------
+GENOTYPES = ["AA", "AC", "AG", "AT", "CC", "CG", "CT", "GG", "GT", "TT"]   # Clair3's GT21 SNP order
+
+
+def _gt(a, b):
+    return "".join(sorted(a + b))
+
+
+def genotype_probs(probe, p_mixed, x_min=X_MIN):
+    """P over the 10 unordered base pairs at one call, as a zygosity x identity product:
+    homozygous X = (1 - p_mixed) for the primary base; heterozygous pairs share p_mixed in
+    proportion to each other channel's co-located ratio (the strongest co-located second
+    channel dominates)."""
+    prim = probe["primary"]
+    w = {}
+    for b in "ACGT":
+        if b == prim:
+            continue
+        c = probe["channels"][b]
+        r = c["ratio"] if (c["apex"] and c["offset"] is not None and abs(c["offset"]) <= COLOCATE_MAX) else c["ratio"] * 0.1
+        w[b] = max(r, x_min * 0.1)
+    tot = sum(w.values())
+    probs = {g: 1e-6 for g in GENOTYPES}
+    probs[_gt(prim, prim)] = max(1 - p_mixed, 1e-6)
+    for b, v in w.items():
+        probs[_gt(prim, b)] = max(p_mixed * v / tot, 1e-6)
+    s = sum(probs.values())
+    return {g: v / s for g, v in probs.items()}
+
+
+def phred_likelihoods(probs):
+    """PL as in VCF / Clair3 compute_PL: -10 log10 of normalised likelihood, shifted so the best is 0."""
+    pl = {g: -10.0 * math.log10(p + 1e-8) for g, p in probs.items()}
+    best = min(pl.values())
+    return {g: int(math.ceil(v - best)) for g, v in pl.items()}
+
+
+def call_genotype(probs):
+    """(genotype, GQ): GQ = Phred of the probability that the call is wrong, capped at 99."""
+    g = max(probs, key=probs.get)
+    return g, int(min(99, round(-10.0 * math.log10(max(1 - probs[g], 1e-10)))))

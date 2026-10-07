@@ -19,7 +19,7 @@ height ratio x to the primary and its apex offset |o| in peak spacings, or "none
 - **H0 is fitted from the read itself**, robustly (median/MAD), over its unflagged span: a read's
   own spill and noise define "nothing here" for that read. A few real double positions do not
   move a median.
-- **H1 is a global default** (`DEFAULT_ALT`: second peak at x ≈ 0.5, offset s = 0.047, tail weight
+- **H1 starts as a global default** (per-read adaptation: see "Per-read H1" below) (`DEFAULT_ALT`: second peak at x ≈ 0.5, offset s = 0.047, tail weight
   e = 0.16, fitted by EM) learned from synthetic mixtures only.
 - Output: **LBF = log10 [P(data | two bases) / P(data | one base)]**; independent of any prior.
   LBF 1 = 10:1, 2 = 100:1. Posterior = LBF combined with a prior the *user* states (e.g. 0.05).
@@ -70,7 +70,62 @@ H0 fitted per file from the clean stretch before the indel.
 
 ## Next
 
-1. Per-read H1 (adapt μ1, σ1, s to the read) and re-test under noise.
+1. ~~Per-read H1~~ done (below).
 2. Real labelled mixtures: colleagues' heterozygote traces; known-template mixes at known ratios.
 3. Use the LBF in `export.to_sequence` to decide IUPAC (instead of 0.33) once step 2 supports it.
 4. Replace the heterozygous-indel z-threshold with a posterior over (onset, size, no indel).
+
+## Per-read H1 (2026-10-07; the CLI uses this)
+
+`adapt_alt`: self-training (EM) on the read's own calls. Each call gets a responsibility
+r = P(two bases | data); H1's parameters are re-estimated from the r-weighted observations, with 30
+pseudo-observations pulling them back to the global values, so a read with no real double positions
+stays near the global H1. The fraction of two-base calls π is estimated as well, so the posterior
+no longer needs a stated prior (LBF still does not depend on it).
+
+Same 210 synthetic mixtures, same leave-one-source-read-out protocol (`EVAL_MODE=em`):
+
+| | AUC global H1 | AUC per-read H1 | ratio alone |
+|---|---|---|---|
+| all | 0.986 | **0.992** | 0.960 |
+| 20 % minor allele, clean | 0.993 | 0.994 | 0.972 |
+| noise + jitter | 0.951 | **0.971** | 0.964 |
+| LBF > 1 at 20 % allele: sens / spec | 0.68 / 0.997 | 0.83 / 0.989 | rule 0.34 / 0.988 |
+
+Log-loss 0.154 → 0.121 (prior-only 0.687); calibration still close to the diagonal (predicted vs
+observed 0.002/0.002, 0.049/0.052, 0.185/0.194, 0.395/0.450, 0.605/0.643, 0.818/0.882,
+0.950/0.976, 0.996/0.999). Unmodified reads: estimated π = 0.001 (C1), 0.001 (A2), 0.042 (A3);
+LBF > 1 at 1/205, 0/220, 9/211 calls, i.e. no double peaks invented. The 20 %-allele specificity
+dropped slightly (0.997 → 0.989); that is the price of the extra sensitivity.
+
+Real reads (Thermocyclops F2, G2): per-read H1 converged to the synthetic shape (second peak at 0.51
+of the main, spread 0.48 in log, offset 0.049) without being told; π = 0.068 and 0.058, against
+16-17 shared double positions in ~250 calls. Results at the 16 reproduced sites are unchanged
+(10 with summed LBF > 2; 204 = 1.43, 251 = 1.41), so the weak sites are weak in the data, not in
+the model.
+
+## Genotype output (Clair3's convention; `gt`, `gq`, `pl`, `p_mixed` columns)
+
+Per call, probability over the 10 unordered base pairs (AA, AC, AG, AT, CC, CG, CT, GG, GT, TT, the
+order Clair3 uses for its SNP genotypes) as zygosity × identity: homozygous for the primary base with
+1 − p_mixed; the heterozygous pairs share p_mixed in proportion to each other channel's co-located
+ratio. PL = −10 log10 of the normalised likelihood shifted to 0 for the best genotype (VCF
+convention, Clair3's `compute_PL`); GQ = Phred of the probability the call is wrong, capped at 99.
+Example, Thermocyclops F2 call 211 (reference 204): read alone AA, GQ 17; the same site is IUPAC `R`
+in the FASTA only because the second specimen reproduces it. The FASTA still follows the 0.33 / reproduction
+rules; switching to the genotype call is the next step.
+
+## What was taken from Clair3 (source read 2026-10-07, commit eb625c7, BSD-3; no code copied)
+
+| in Clair3 | what it does | used here |
+|---|---|---|
+| `task/main.py`, `gt21.py`, `genotype.py` | outputs: 21 unordered genotypes + 3-way zygosity + two sorted per-allele length heads (−16…+16) | 10 unordered base-pair genotypes × zygosity; sorted-allele idea noted for the indel decoder's P/Q order |
+| `CallVariants.py` `compute_PL`, `quality_score_from` | normalise the product of heads over candidate genotypes → Phred likelihoods; QUAL from P(not reference) | `phred_likelihoods`, `call_genotype` (GQ) |
+| `shared/param_*.py` `min_af_dict` | candidate gate depends on platform noise (0.08 HiFi/Illumina, 0.15 ONT) | same principle as the per-read floor and the per-read null |
+| pileup model → full-alignment model on low-QUAL candidates | cheap network on everything, expensive one where unsure | v0.3 flags first, indel decoder only on the unflagged span |
+| `Train.py` FocalLoss with class-balanced weights (beta 0.999), RAdam | rare classes (het, indel) not drowned by the reference class | not used (no network); relevant if one is ever trained here |
+| BiLSTM (pileup) / residual CNN (full alignment) over a 33-position window, 16 flanking bases | learn context effects from millions of labelled sites | not used: our labelled corpus is ~400 calls plus synthetic mixtures |
+
+Not taken, and why: the networks themselves (data), per-strand count channels (a single Sanger
+read has no strand replicate; a forward + reverse pair would), haplotype phasing channels (no
+Sanger analogue except the two-allele decoder).

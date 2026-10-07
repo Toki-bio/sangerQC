@@ -14,6 +14,7 @@ reads (every call single).
 """
 import csv
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -107,12 +108,16 @@ def main(bench, outdir):
         for r in data[held]:
             lbfs = []
             m = bayes.fit_null([r["obs"][i] for i in r["null_idx"]], alt)
+            pi_r = prior
+            if os.environ.get("EVAL_MODE") == "em":
+                m, pi_r = bayes.adapt_alt([r["obs"][i] for i in r["truth"]], m)
             for i, t in r["truth"].items():
                 o = r["obs"][i]
                 lbf = bayes.log10_bf(o, m)
                 allrows.append(dict(held=held, file=r["file"], k=r["k"], w=r["w"], noise=r["noise"], i=i + 1,
                                     truth=int(t), x=o[0] if o else 0.0, off=o[1] if o else "", lbf=lbf,
-                                    post=bayes.posterior(lbf, prior), rule=int(rule_call(o))))
+                                    post=bayes.posterior(lbf, pi_r if os.environ.get("EVAL_MODE") == "em" else prior),
+                                    rule=int(rule_call(o))))
     with open(outdir / "eval_positions.tsv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(allrows[0]), delimiter="\t")
         w.writeheader()
@@ -159,6 +164,9 @@ def main(bench, outdir):
         raw = raw_of(path, lo, hi)
         obs = bayes.observations(raw)
         m = bayes.fit_null(obs[lo - 1:hi], alt)
+        if os.environ.get("EVAL_MODE") == "em":
+            m, pi_c = bayes.adapt_alt(obs[lo - 1:hi], m)
+            print(f"  {key}: estimated fraction of two-base calls pi = {pi_c:.3f}")
         lbf = [bayes.log10_bf(obs[i], m) for i in range(lo - 1, hi)]
         rule = [rule_call(obs[i]) for i in range(lo - 1, hi)]
         print(f"  {key}: {sum(l > 1 for l in lbf)}/{len(lbf)} calls LBF>1, {sum(l > 2 for l in lbf)} LBF>2; old rule flags {sum(rule)}")

@@ -16,7 +16,8 @@ from pathlib import Path
 from Bio import SeqIO
 
 from .concordance import reference_status, reproduced_sites
-from .bayes import DEFAULT_ALT, fit_null, log10_bf, observations
+from .bayes import (DEFAULT_ALT, adapt_alt, call_genotype, fit_null, genotype_probs, log10_bf, observations,
+                    phred_likelihoods, posterior, GENOTYPES)
 from .export import FIELDS, kept_span, to_sequence
 from . import __version__
 from .secondary import COLOCATE_MAX, RATIO_CALL, RATIO_MIN, background_rate
@@ -40,9 +41,17 @@ def main(argv=None):
         # log10 Bayes factor for "two bases here" (bayes.py): H0 from this read's own unflagged span
         obs = observations(raw)
         sp = kept_span(pred, len(raw["seq"]))
-        null = fit_null(obs[sp[0] - 1:sp[1]] if sp else obs, DEFAULT_ALT)
+        span_obs = obs[sp[0] - 1:sp[1]] if sp else obs
+        model, pi = adapt_alt(span_obs, fit_null(span_obs, DEFAULT_ALT))   # H0 and H1 both from this read
+        raw["bayes"] = dict(pi=round(pi, 4), model={k: round(v, 4) for k, v in model.to_dict().items()})
         for i, o in enumerate(obs):
-            pred[i + 1]["lbf"] = round(log10_bf(o, null), 2)
+            lbf = log10_bf(o, model)
+            pm = posterior(lbf, pi)
+            probs = genotype_probs(raw["secondary_records"][i]["probe"], pm)
+            gt, gq = call_genotype(probs)
+            pl = phred_likelihoods(probs)
+            pred[i + 1].update(lbf=round(lbf, 2), p_mixed=round(pm, 4), gt=gt, gq=gq,
+                               pl=",".join(str(pl[g]) for g in GENOTYPES))
         items.append((Path(f).stem, pred, raw))
         paths[Path(f).stem] = Path(f)
 
@@ -60,6 +69,8 @@ def main(argv=None):
             seq, rows, span = to_sequence(pred, raw, reproduced=reproduced[name], ref_status=rs)
             d = dict(raw["diagnostics"])
             d["file"] = paths[name].name
+            d["bayes_pi"] = raw["bayes"]["pi"]
+            d["bayes_model"] = raw["bayes"]["model"]
             d["file_md5"] = hashlib.md5(paths[name].read_bytes()).hexdigest()
             d["kept_span"] = span
             d["length_out"] = len(seq)

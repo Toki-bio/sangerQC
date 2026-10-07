@@ -9,6 +9,7 @@ SECONDARY_PEAKS.md). Reference for "truth": sites where BOTH reads show a co-loc
 (the 16 manual/automatic reproduced sites). That is evidence, not proof, so the comparison reports
 how the two ways of using the same two reads rank those sites against every other position.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -40,6 +41,9 @@ def main(bench, f2, g2, ref_fa):
         obs = bayes.observations(raw)
         m = bayes.fit_null(obs[lo - 1:hi], alt)
         print(f"{name}: null q0={m.q0:.2f} median x={np.exp(m.mu0):.2f} s0={m.s0:.2f}")
+        if os.environ.get("EVAL_MODE") == "em":
+            m, pi = bayes.adapt_alt(obs[lo - 1:hi], m)
+            print(f"{name}: per-read H1 (EM): pi={pi:.3f} mu1x={np.exp(m.mu1):.2f} s1={m.s1:.2f} so={m.so:.3f} eo={m.eo:.2f}")
         mp = map_to_reference(raw["seq"], ref)             # ref index0 -> (read index0, strand)
         lbf = {j: bayes.log10_bf(obs[i], m) for j, (i, _) in mp.items() if lo - 1 <= i <= hi - 1}
         rule = {j: int(E.rule_call(obs[i])) for j, (i, _) in mp.items() if lo - 1 <= i <= hi - 1}
