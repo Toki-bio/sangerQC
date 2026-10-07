@@ -1,6 +1,9 @@
 # Changes after v0.3
 
 ## 2026-10-07
+- **Real-data check:** heterozygous-indel decoder on ~1,400 real SINE-flank reads (HET_INDEL.md): enrichment in labelled
+  heterozygotes, 0.9 % calls on single-allele clones; real mixed regions have displaced second-allele peaks the
+  per-position model underrates (open).
 - **Fix:** primary channel at a call = tallest channel with a real apex on the call, not the tallest value in the
   slot (a neighbour's tail could win and turn a single base into a "double"). Python and JS. Found on the
   allergology plates; synthetic benchmarks unchanged, cyclops site at reference 269 moved from strong to against.

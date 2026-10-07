@@ -96,6 +96,31 @@ Limits of this test: one indel per read, no SNPs between the alleles, both allel
 same real trace, white noise. It shows the logic works and where it breaks; it is not evidence on
 real heterozygotes.
 
+## First check on real heterozygous-indel material (2026-10-07)
+
+Direct sequencing of lizard SINE-flank PCR products (unpublished; ~900 unique direct reads, 528 cloned single-allele
+reads, specimen labels in the folder names, `h` = heterozygous locus on agarose gels). No clone-confirmed truth
+for the direct reads, so this is an enrichment test, not an accuracy test:
+
+| group of reads | reads | decoder calls an indel |
+|---|---|---|
+| cloned (one allele each) | 528 | 5 (0.9 %) |
+| unlabelled direct reads | 878 | 81 (9.2 %) |
+| labelled "hetero" | 19 | 7 (37 %) |
+| labelled "homozygous then heterozygous" | 6 | 5 (83 %) |
+| `h` folders (gel-heterozygous locus) | 27 | 6 (22 %) |
+
+In one parthenogenetic species the decoder recovered the same 14-base one-allele block and the same clean flank in
+reads from three different individuals (two more related reads gave the same size and place), as expected for a
+fixed heterozygous indel in a clone. Not recovered: sizes written in some labels ("hetero 10bp", "8bp").
+
+**Finding that changes the model:** in the real mixed regions the second allele's peaks are often displaced by a
+fraction of a position from the first allele's, so the per-position Bayes factor (which expects the second peak on
+the called peak, offset <= 0.35) is low where the trace is visibly mixed; the decoder, which uses only the pattern
+of double positions, is less affected. The synthetic mixtures (one trace warped) did not have this, so they
+overstate how well the position-wise model works on indel carriers. Next step: model allele-specific peak offsets
+(or widen the co-location window inside a decoded mixed run) and re-test.
+
 ## What real data is needed next
 
 Synthetic mixtures are too clean in one way that matters: both alleles have identical peak
