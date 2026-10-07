@@ -16,7 +16,8 @@ from pathlib import Path
 from Bio import SeqIO
 
 from .concordance import reference_status, reproduced_sites
-from .export import FIELDS, to_sequence
+from .bayes import DEFAULT_ALT, fit_null, log10_bf, observations
+from .export import FIELDS, kept_span, to_sequence
 from . import __version__
 from .secondary import COLOCATE_MAX, RATIO_CALL, RATIO_MIN, background_rate
 from .v0_3 import classify
@@ -36,6 +37,12 @@ def main(argv=None):
     items, paths = [], {}
     for f in a.ab1:
         pred, raw = classify(f, forward=a.forward, reverse=a.reverse)
+        # log10 Bayes factor for "two bases here" (bayes.py): H0 from this read's own unflagged span
+        obs = observations(raw)
+        sp = kept_span(pred, len(raw["seq"]))
+        null = fit_null(obs[sp[0] - 1:sp[1]] if sp else obs, DEFAULT_ALT)
+        for i, o in enumerate(obs):
+            pred[i + 1]["lbf"] = round(log10_bf(o, null), 2)
         items.append((Path(f).stem, pred, raw))
         paths[Path(f).stem] = Path(f)
 
@@ -72,10 +79,12 @@ def main(argv=None):
     if sites:
         with open(out / "reproduced_sites.tsv", "w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh, delimiter="\t")
-            w.writerow(["ref_pos", "pair", "read", "read_pos", "primary", "secondary", "ratio"])
+            w.writerow(["ref_pos", "pair", "read", "read_pos", "primary", "secondary", "ratio", "lbf", "sum_lbf"])
+            pr = {name: pred for name, pred, _ in items}
             for j, s in sorted(sites.items()):
+                tot = round(sum(pr[n][i]["lbf"] for n, (i, _, _, _) in s["reads"].items()), 2)
                 for name, (i, p, q, r) in s["reads"].items():
-                    w.writerow([j, "/".join(sorted(s["pair"])), name, i, p, q, r])
+                    w.writerow([j, "/".join(sorted(s["pair"])), name, i, p, q, r, pr[name][i]["lbf"], tot])
     summary["_run"] = {"sangerqc_version": __version__, "params": {
         "ratio_min": RATIO_MIN, "ratio_call": RATIO_CALL, "colocate_max": COLOCATE_MAX},
         "forward": a.forward, "reverse": a.reverse, "reference": a.reference}

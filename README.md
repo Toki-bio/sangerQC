@@ -44,6 +44,8 @@ With `--reference`, the ends are also trimmed where a 10-base window disagrees w
 Checks behind v0.3 (`validation/`): labelled C1/G4/B3 zones unchanged (accuracy 0.933 / 0.898 / 0.786 as v0.2); bad/ok flags identical to v0.2 on all six Artemia and two Thermocyclops reads; Python and browser JS agree on every position of those eight reads (`validation/parity.py`).
 The co-location test was calibrated on two reads only; the false-positive control (a non-called base passing at ordinary positions) was 1.0 % and 2.3 % there. Treat it as a candidate rule until it survives more labelled files.
 
+**Bayes factor** for "two bases at this call" (`lbf` column in the CLI tables; [BAYES.md](BAYES.md)): AUC 0.986 vs 0.960 for the ratio on 210 synthetic mixtures, calibrated, 10:1 = LBF 1. Reported only; the FASTA still uses the 0.33 rule.
+
 Heterozygous indels (prototype, not in the CLI yet): `sangerqc/hetindel.py` (`decode_read`) splits a mixed trace into its two alleles using the co-located peak sets, with or without a reference; `sangerqc/synth.py` makes synthetic het-indel .ab1 files from clean reads; benchmark against Tracy in [HET_INDEL.md](HET_INDEL.md).
 
 Never trim from Phred alone. Never issue a verdict by eyeballing a rendered plot.

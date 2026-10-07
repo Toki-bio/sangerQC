@@ -24,6 +24,7 @@ One row for every position where any non-called channel reaches `ratio >= 0.20`.
 | `h_A h_C h_G h_T` | each channel's maximum inside the call's slot (RFU) |
 | `apex_off_A … apex_off_T` | offset of each channel's own interior apex from the called peak, in peak spacings; empty if no apex |
 | `primary`, `secondary`, `ratio` | strongest channel, strongest second channel, their height ratio |
+| `lbf` | log10 Bayes factor, two bases vs one base (BAYES.md); add across reads, prior-free |
 | `sec_class` | `none` / `spill` (neighbour's tail: no apex or offset > 0.35) / `colocated` / `near_sat` (co-located inside ±10 calls of a peak ≥ 3 × HQ: pull-up) |
 | `local_level`, `hq`, `low_snr` | amplitude context: a ratio at 15 RFU is not the same evidence as at 400 RFU |
 | `sangerqc_version`, `params` | `ratio_min`, `ratio_call`, `colocate_max`; a class means nothing without them |
