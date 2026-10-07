@@ -74,18 +74,24 @@ def channel_probe(raw, i):
     n_scans = len(ch["A"])
     L, R, sp = slot(ploc, i, n_scans)
     h = {b: float(ch[b][L:R + 1].max()) for b in "ACGT"}
-    primary = max(h, key=h.get)
-    top = h[primary]
+    apex = {}
+    for b in "ACGT":
+        k = _interior_apex(ch[b][L:R + 1])
+        if k is not None:
+            apex[b] = (float(ch[b][L + k]), (L + k - ploc[i]) / sp)
+    # Primary = the tallest channel with a real apex on the call. The tallest value anywhere in the
+    # slot can be the tail of a taller neighbouring peak (e.g. a small G after a big C), which
+    # made a true single base look like a double (found on the allergology plates, 2026-10-07).
+    on_call = {b: v[0] for b, v in apex.items() if abs(v[1]) <= COLOCATE_MAX}
+    primary = max(on_call, key=on_call.get) if on_call else max(h, key=h.get)
+    top = on_call[primary] if on_call else h[primary]
     out = {"primary": primary, "top": top, "channels": {}}
     for b in "ACGT":
-        w = ch[b][L:R + 1]
-        k = _interior_apex(w)
-        if k is None:
+        if b not in apex:
             out["channels"][b] = dict(height=h[b], ratio=h[b] / top if top else 0.0, apex=False, offset=None)
         else:
-            off = (L + k - ploc[i]) / sp
-            out["channels"][b] = dict(height=float(w[k]), ratio=float(w[k]) / top if top else 0.0,
-                                      apex=True, offset=float(off))
+            out["channels"][b] = dict(height=apex[b][0], ratio=apex[b][0] / top if top else 0.0,
+                                      apex=True, offset=float(apex[b][1]))
     return out
 
 

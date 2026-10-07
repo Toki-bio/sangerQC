@@ -46,6 +46,8 @@ The co-location test was calibrated on two reads only; the false-positive contro
 
 **Bayes factor** for "two bases at this call" ([BAYES.md](BAYES.md)): per-read model, AUC 0.992 vs 0.960 for the ratio on 210 synthetic mixtures, calibrated, 10:1 = LBF 1. The CLI tables carry `lbf`, `p_mixed` and a Clair3-style genotype (`gt`, `gq`, `pl`); the FASTA still uses the 0.33 / reproduction rules.
 
+**Several reads of one template** (forward + reverse, re-reads, other primers): `python -m sangerqc.multicli` combines them into one genotype per reference position, with genotype quality and conflict reporting; tested on 23 samples × 2 SNPs with forward + reverse reads and manual genotypes ([MULTIREAD.md](MULTIREAD.md)): zygosity matches the report in 46/46 sample-SNP pairs; only forward + reverse weighting is tested.
+
 Heterozygous indels (prototype, not in the CLI yet): `sangerqc/hetindel.py` (`decode_read`) splits a mixed trace into its two alleles using the co-located peak sets, with or without a reference; `sangerqc/synth.py` makes synthetic het-indel .ab1 files from clean reads; benchmark against Tracy in [HET_INDEL.md](HET_INDEL.md).
 
 Never trim from Phred alone. Never issue a verdict by eyeballing a rendered plot.

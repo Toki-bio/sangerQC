@@ -328,21 +328,29 @@
     else sp = 12;
     sp = Math.max(sp, 1);
     const h = {};
+    const apex = {};
     for (const b of "ACGT") {
       const ch = rec.channels[b];
       let m = -Infinity;
       for (let s = L; s <= R; s++) if (ch[s] > m) m = ch[s];
       h[b] = m;
+      const k = interiorApex(ch, L, R);
+      if (k >= 0) apex[b] = { v: ch[k], off: (k - ploc[i]) / sp };
     }
-    let primary = "A";
-    for (const b of "CGT") if (h[b] > h[primary]) primary = b;
-    const top = h[primary];
+    // primary = tallest channel with a real apex on the call (not the tail of a taller neighbour)
+    let primary = null;
+    for (const b of "ACGT") {
+      if (apex[b] && Math.abs(apex[b].off) <= SEC_COLOC_MAX && (primary === null || apex[b].v > apex[primary].v)) primary = b;
+    }
+    if (primary === null) {
+      primary = "A";
+      for (const b of "CGT") if (h[b] > h[primary]) primary = b;
+    }
+    const top = apex[primary] && Math.abs(apex[primary].off) <= SEC_COLOC_MAX ? apex[primary].v : h[primary];
     const channels = {};
     for (const b of "ACGT") {
-      const ch = rec.channels[b];
-      const k = interiorApex(ch, L, R);
-      if (k < 0) channels[b] = { height: h[b], ratio: top ? h[b] / top : 0, apex: false, offset: null };
-      else channels[b] = { height: ch[k], ratio: top ? ch[k] / top : 0, apex: true, offset: (k - ploc[i]) / sp };
+      if (!apex[b]) channels[b] = { height: h[b], ratio: top ? h[b] / top : 0, apex: false, offset: null };
+      else channels[b] = { height: apex[b].v, ratio: top ? apex[b].v / top : 0, apex: true, offset: apex[b].off };
     }
     return { primary, top, channels };
   }

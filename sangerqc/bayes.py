@@ -25,6 +25,10 @@ import numpy as np
 from .secondary import COLOCATE_MAX
 
 X_MIN = 0.05   # ignore co-located seconds weaker than this (below the trace's own wobble)
+# Probability that a real second peak is missed (allele dropout / strong imbalance in one read).
+# Synthetic mixtures never miss it (fit gives ~0), real heterozygote reads do: on the allergology
+# plates 1 of 20 reads of known heterozygotes showed no second peak. Floor at 2%, default 5%.
+Q1_MIN = 0.02
 S_MIN = 0.5    # floor for the null's spread in log x: keeps the null from claiming certainty
 
 
@@ -45,7 +49,7 @@ class Model:
 
 # H1 fitted on 2026-10 synthetic mixtures (3 Artemia source reads, allele A share 0.2-0.5, with and
 # without noise); real heterozygotes are not in it. Treat the numbers as a starting point.
-DEFAULT_ALT = Model(q0=0.9, mu0=math.log(0.12), s0=0.7, q1=0.001, mu1=-0.68, s1=0.49, so=0.047, eo=0.16)
+DEFAULT_ALT = Model(q0=0.9, mu0=math.log(0.12), s0=0.7, q1=0.05, mu1=-0.68, s1=0.49, so=0.047, eo=0.16)
 
 
 def observe(probe, x_min=X_MIN, colocate_max=COLOCATE_MAX):
@@ -100,7 +104,7 @@ def fit_alt(obs_list, base=None):
     """Fit H1 from observations at positions known to carry two bases."""
     m = Model(**(base.to_dict() if base else {}))
     seen = [o for o in obs_list if o is not None]
-    m.q1 = 1 - len(seen) / max(1, len(obs_list))
+    m.q1 = max(1 - len(seen) / max(1, len(obs_list)), Q1_MIN)
     if len(seen) >= 10:
         lx = np.log([o[0] for o in seen])
         m.mu1, m.s1 = float(np.mean(lx)), float(max(np.std(lx), 0.2))
@@ -170,7 +174,7 @@ def adapt_alt(obs_list, m: Model, n0=30.0, iters=30, prior0=0.05):
         lx = np.array([math.log(o[0]) for _, o in seen])
         offs = np.array([o[1] for _, o in seen])
         W = w_seen.sum()
-        cur.q1 = float(min(max((n0 * base.q1 + (w_all - W)) / (n0 + w_all), 1e-3), 0.9))
+        cur.q1 = float(min(max((n0 * base.q1 + (w_all - W)) / (n0 + w_all), Q1_MIN), 0.9))
         cur.mu1 = float((n0 * base.mu1 + np.sum(w_seen * lx)) / (n0 + W))
         var = (n0 * (base.s1 ** 2) + np.sum(w_seen * (lx - cur.mu1) ** 2)) / (n0 + W)
         cur.s1 = float(max(math.sqrt(var), 0.2))

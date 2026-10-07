@@ -129,3 +129,22 @@ rules; switching to the genotype call is the next step.
 Not taken, and why: the networks themselves (data), per-strand count channels (a single Sanger
 read has no strand replicate; a forward + reverse pair would), haplotype phasing channels (no
 Sanger analogue except the two-allele decoder).
+
+## Update 2026-10-07 (after the allergology plates; supersedes the numbers above where they differ)
+
+Two corrections, both found on real reads (details in MULTIREAD.md):
+
+1. **Primary channel.** It was the channel with the highest value anywhere in the slot; a small G after a big C
+   then lost to the C's tail and the G looked like a second base. Primary is now the tallest channel with a
+   real apex on the call. Synthetic results are unchanged (they reuse a trace's own clean peaks).
+2. **Miss rate of a real second peak, q1.** Fitted at 0.001 on synthetic mixtures (the second peak is never
+   absent there); on the plates 1 of 20 reads of known heterozygotes showed none. Floor 0.02, default 0.05
+   (`Q1_MIN`, `DEFAULT_ALT`). The plates motivated this, so they are not independent evidence for it.
+
+Re-run, same protocols: synthetic, per-read H1: AUC 0.991 (was 0.992), noise + jitter 0.970, log-loss 0.128
+(was 0.121; the floor costs a little where nothing is ever missed); unmodified reads unchanged (LBF > 1 at
+1/205, 0/220, 9/211). Thermocyclops F2/G2 (per-read H1, π = 0.038 and 0.048): 12 of the 16 reproduced sites
+have summed LBF > 1 and 10 have > 2 (none of the other 181 shared positions exceeds 0.1); the weak ones are
+204 (1.5), 212 (0.9), 214 (−0.9), 220 (0.9), 251 (1.6) and **269 (−0.9)**, which the primary-channel fix
+moved from strong (+2.0 in F2) to against: it was a small G next to a larger A. Sites 204 and 251, the two
+that separate Japanese *T. taihokuensis* from Taiwanese *Thermocyclops* sp. 1, stay at about 30:1 each.
