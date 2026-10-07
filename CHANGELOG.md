@@ -1,6 +1,10 @@
 # Changes after v0.3
 
 ## 2026-10-07
+- **Fix (real indel carriers):** per-read baseline no longer fitted from the read itself; `adapt_model` starts from
+  real single-allele reads (clones) and adapts both hypotheses by EM. Clean-then-mixed step at the decoded onset now
+  visible in 37/50 carriers (was 1/50). The earlier note about "displaced second-allele peaks" was wrong and is corrected
+  in HET_INDEL.md.
 - **Real-data check:** heterozygous-indel decoder on ~1,400 real SINE-flank reads (HET_INDEL.md): enrichment in labelled
   heterozygotes, 0.9 % calls on single-allele clones; real mixed regions have displaced second-allele peaks the
   per-position model underrates (open).

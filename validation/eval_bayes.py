@@ -111,12 +111,16 @@ def main(bench, outdir):
             pi_r = prior
             if os.environ.get("EVAL_MODE") == "em":
                 m, pi_r = bayes.adapt_alt([r["obs"][i] for i in r["truth"]], m)
+            elif os.environ.get("EVAL_MODE") == "em2":
+                # H0 from the global clone baseline, then both hypotheses adapt (no clean prefix assumed)
+                base = bayes.Model(**{**alt.to_dict(), **{k: getattr(bayes.DEFAULT_MODEL, k) for k in ("q0", "mu0", "s0")}})
+                m, pi_r = bayes.adapt_model([r["obs"][i] for i in r["truth"]], base, n0_h0=float(os.environ.get("N0H0", 30)))
             for i, t in r["truth"].items():
                 o = r["obs"][i]
                 lbf = bayes.log10_bf(o, m)
                 allrows.append(dict(held=held, file=r["file"], k=r["k"], w=r["w"], noise=r["noise"], i=i + 1,
                                     truth=int(t), x=o[0] if o else 0.0, off=o[1] if o else "", lbf=lbf,
-                                    post=bayes.posterior(lbf, pi_r if os.environ.get("EVAL_MODE") == "em" else prior),
+                                    post=bayes.posterior(lbf, pi_r if os.environ.get("EVAL_MODE") in ("em", "em2") else prior),
                                     rule=int(rule_call(o))))
     with open(outdir / "eval_positions.tsv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(allrows[0]), delimiter="\t")
@@ -164,7 +168,10 @@ def main(bench, outdir):
         raw = raw_of(path, lo, hi)
         obs = bayes.observations(raw)
         m = bayes.fit_null(obs[lo - 1:hi], alt)
-        if os.environ.get("EVAL_MODE") == "em":
+        if os.environ.get("EVAL_MODE") == "em2":
+            m, pi_c = bayes.adapt_model(obs[lo - 1:hi], bayes.DEFAULT_MODEL)
+            print(f"  {key}: estimated fraction of two-base calls pi = {pi_c:.3f}")
+        elif os.environ.get("EVAL_MODE") == "em":
             m, pi_c = bayes.adapt_alt(obs[lo - 1:hi], m)
             print(f"  {key}: estimated fraction of two-base calls pi = {pi_c:.3f}")
         lbf = [bayes.log10_bf(obs[i], m) for i in range(lo - 1, hi)]

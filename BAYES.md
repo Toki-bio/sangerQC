@@ -148,3 +148,30 @@ have summed LBF > 1 and 10 have > 2 (none of the other 181 shared positions exce
 204 (1.5), 212 (0.9), 214 (−0.9), 220 (0.9), 251 (1.6) and **269 (−0.9)**, which the primary-channel fix
 moved from strong (+2.0 in F2) to against: it was a small G next to a larger A. Sites 204 and 251, the two
 that separate Japanese *T. taihokuensis* from Taiwanese *Thermocyclops* sp. 1, stay at about 30:1 each.
+
+## Global-start model (2026-10-07, `adapt_model`; supersedes the per-read fit above)
+
+Problem found on real indel carriers (SINE-flank reads, see HET_INDEL.md): `fit_null` takes the single-base baseline
+from the read by median/MAD. That works up to a minority of mixed positions; in a heterozygous-indel read about half
+of the positions are mixed, so the baseline moves onto the mixture (median second-peak ratio 0.70 in 60 confident
+carriers against 0.06 in 300 cloned, single-allele reads) and the model sees almost nothing (1.3 % of positions above
+100:1). The synthetic test did not show it because its baseline came from the clean stretch before the onset.
+
+Fix: H0 starts from values measured on real single-allele reads (300 cloned reads, 191,548 positions: 17 % of
+positions carry a weak co-located second apex, median ratio 0.067, offsets uniform) and **both** hypotheses adapt by EM,
+each shrunk to the global values by pseudo-observations (30 for H1, 10 for H0). Mixed positions are assigned to H1 by
+their responsibilities, so they no longer train the baseline.
+
+| check | read-fitted baseline | global-start model |
+|---|---|---|
+| 50 decoder-confident indel carriers: share of positions above 100:1 before / after the decoded onset (median) | 0.00 / 0.00 (step in 1/50) | 0.02 / 0.69 (step in 37/50) |
+| cloned reads (single allele): positions above 100:1 | 0.14 % | 0.45 % |
+| synthetic mixtures, AUC / log-loss, no clean stretch assumed | (needs the clean stretch) | 0.991 / 0.132 |
+| synthetic mixtures, overall log-loss | 0.128 (baseline from the clean stretch) | 0.132 (noisy conditions: 0.141 and 0.326; with n0 = 30: 0.79 and 2.59) |
+| allergology plates, zygosity vs report | 46/46 joint (biallelic) | 46/46 biallelic; flat prior 45/46 |
+| Thermocyclops, 16 reproduced sites with summed LBF > 2 | 10 | 10 |
+
+The pseudo-observation count for H0 was chosen on the synthetic set from three values (30, 10, 3: log-loss 0.716,
+0.132, 0.131; with 30 the baseline cannot follow the synthetic white noise); 10 was taken as the middle of the flat
+region. The step check on real carriers and the clone control were run afterwards and did not enter that choice.
+Cost: more weak calls on clones (0.45 % against 0.14 % of positions above 100:1).

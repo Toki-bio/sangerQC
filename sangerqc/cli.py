@@ -16,7 +16,7 @@ from pathlib import Path
 from Bio import SeqIO
 
 from .concordance import reference_status, reproduced_sites
-from .bayes import (DEFAULT_ALT, adapt_alt, call_genotype, fit_null, genotype_probs, log10_bf, observations,
+from .bayes import (DEFAULT_MODEL, adapt_model, call_genotype, genotype_probs, log10_bf, observations,
                     phred_likelihoods, posterior, GENOTYPES)
 from .export import FIELDS, kept_span, to_sequence
 from . import __version__
@@ -42,7 +42,7 @@ def main(argv=None):
         obs = observations(raw)
         sp = kept_span(pred, len(raw["seq"]))
         span_obs = obs[sp[0] - 1:sp[1]] if sp else obs
-        model, pi = adapt_alt(span_obs, fit_null(span_obs, DEFAULT_ALT))   # H0 and H1 both from this read
+        model, pi = adapt_model(span_obs, DEFAULT_MODEL)   # global start, H0 and H1 both adapt to this read
         raw["bayes"] = dict(pi=round(pi, 4), model={k: round(v, 4) for k, v in model.to_dict().items()})
         for i, o in enumerate(obs):
             lbf = log10_bf(o, model)

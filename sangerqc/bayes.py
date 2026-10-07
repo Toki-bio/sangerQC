@@ -49,7 +49,11 @@ class Model:
 
 # H1 fitted on 2026-10 synthetic mixtures (3 Artemia source reads, allele A share 0.2-0.5, with and
 # without noise); real heterozygotes are not in it. Treat the numbers as a starting point.
-DEFAULT_ALT = Model(q0=0.9, mu0=math.log(0.12), s0=0.7, q1=0.05, mu1=-0.68, s1=0.49, so=0.047, eo=0.16)
+# H0 (one base) from 300 real cloned reads (single allele each, 191,548 positions; 2026-10-07): 17 % of positions
+# have a weak co-located second apex (>= 0.05), median ratio 0.067, offsets uniform. Noise varies a lot between
+# reads (share of such positions 1-94 %), hence per-read adaptation (adapt_model).
+DEFAULT_ALT = Model(q0=0.83, mu0=-2.46, s0=0.65, q1=0.05, mu1=-0.68, s1=0.49, so=0.047, eo=0.16)
+DEFAULT_MODEL = DEFAULT_ALT
 
 
 def observe(probe, x_min=X_MIN, colocate_max=COLOCATE_MAX):
@@ -228,3 +232,40 @@ def call_genotype(probs):
     """(genotype, GQ): GQ = Phred of the probability that the call is wrong, capped at 99."""
     g = max(probs, key=probs.get)
     return g, int(min(99, round(-10.0 * math.log10(max(1 - probs[g], 1e-10)))))
+
+
+def adapt_model(obs_list, base: Model = None, n0_h1=30.0, n0_h0=10.0, iters=40, prior0=0.05):
+    """Per-read EM for BOTH hypotheses, starting from the global model (not from the read itself).
+
+    Fitting H0 from the read (adapt_alt after fit_null) breaks when a large part of the read is mixed, e.g. an
+    indel carrier: the baseline absorbs the mixed positions and every Bayes factor collapses. Here H0 starts from
+    the clone-derived global values, and positions are shared between H0 and H1 by their responsibilities, so
+    mixed positions train H1 only. Both are shrunk to the global values by pseudo-observations (n0_h1, n0_h0).
+    Returns (Model, pi)."""
+    base = base or DEFAULT_MODEL
+    cur = Model(**base.to_dict())
+    pi = prior0
+    for _ in range(iters):
+        r = np.array([1.0 / (1.0 + math.exp(-max(min((loglik(o, cur, 1) - loglik(o, cur, 0)) + math.log(pi / (1 - pi)), 50), -50)))
+                      for o in obs_list])
+        seen = [(i, o) for i, o in enumerate(obs_list) if o is not None]
+        idx = np.array([i for i, _ in seen], dtype=int)
+        lx = np.array([math.log(o[0]) for _, o in seen])
+        offs = np.array([o[1] for _, o in seen])
+        w1, w0 = r[idx], 1.0 - r[idx]
+        W1, W0 = w1.sum(), w0.sum()
+        # H1
+        cur.q1 = float(min(max((n0_h1 * base.q1 + (r.sum() - W1)) / (n0_h1 + r.sum()), Q1_MIN), 0.9))
+        cur.mu1 = float((n0_h1 * base.mu1 + np.sum(w1 * lx)) / (n0_h1 + W1))
+        cur.s1 = float(max(math.sqrt((n0_h1 * base.s1 ** 2 + np.sum(w1 * (lx - cur.mu1) ** 2)) / (n0_h1 + W1)), 0.2))
+        h = np.array([(1 - cur.eo) * math.exp(_halfnorm_trunc(o, cur.so)) /
+                      ((1 - cur.eo) * math.exp(_halfnorm_trunc(o, cur.so)) + cur.eo / COLOCATE_MAX) for o in offs])
+        cur.so = float(max(math.sqrt((n0_h1 * base.so ** 2 + np.sum(w1 * h * offs ** 2)) / (n0_h1 + np.sum(w1 * h))), 0.02))
+        cur.eo = float(min(max((n0_h1 * base.eo + np.sum(w1 * (1 - h))) / (n0_h1 + W1), 0.0), 0.9))
+        # H0
+        n_all0 = (1.0 - r).sum()
+        cur.q0 = float(min(max((n0_h0 * base.q0 + (n_all0 - W0)) / (n0_h0 + n_all0), 0.02), 0.995))
+        cur.mu0 = float((n0_h0 * base.mu0 + np.sum(w0 * lx)) / (n0_h0 + W0))
+        cur.s0 = float(max(math.sqrt((n0_h0 * base.s0 ** 2 + np.sum(w0 * (lx - cur.mu0) ** 2)) / (n0_h0 + W0)), S_MIN))
+        pi = float(min(max(r.mean(), 1e-3), 0.95))
+    return cur, pi

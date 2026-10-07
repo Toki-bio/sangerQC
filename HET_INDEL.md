@@ -110,16 +110,26 @@ for the direct reads, so this is an enrichment test, not an accuracy test:
 | labelled "homozygous then heterozygous" | 6 | 5 (83 %) |
 | `h` folders (gel-heterozygous locus) | 27 | 6 (22 %) |
 
+Per-position model on the same reads (global-start model, BAYES.md): strong double positions (> 100:1) per 100 bp,
+median: `h` folders 38, "homozygous then heterozygous" reads 37, `hetero` reads 11, unlabelled 0.4, cloned reads 0.
+Read-level AUC of that density, all 52 labelled heterozygous reads vs unlabelled direct reads 0.70, vs clones 0.82; the
+cleanest per-read label (6 "homo→hetero" reads) 0.92 and 0.99; the specimen-level labels alone 0.63-0.69 (they describe
+a locus, not each read). False positives on single-allele clones: 0.60 % of positions above 100:1 (0.34 % after setting
+aside 3 clones that are reproducibly mixed in independent reads, i.e. probably mixed colonies); 65 % of the clone
+calls sit in 8 reads. Fixing the baseline took the decoder-confident carriers from "no clean-then-mixed step" (1/50) to a
+clear step (37/50).
+
 In one parthenogenetic species the decoder recovered the same 14-base one-allele block and the same clean flank in
 reads from three different individuals (two more related reads gave the same size and place), as expected for a
 fixed heterozygous indel in a clone. Not recovered: sizes written in some labels ("hetero 10bp", "8bp").
 
-**Finding that changes the model:** in the real mixed regions the second allele's peaks are often displaced by a
-fraction of a position from the first allele's, so the per-position Bayes factor (which expects the second peak on
-the called peak, offset <= 0.35) is low where the trace is visibly mixed; the decoder, which uses only the pattern
-of double positions, is less affected. The synthetic mixtures (one trace warped) did not have this, so they
-overstate how well the position-wise model works on indel carriers. Next step: model allele-specific peak offsets
-(or widen the co-location window inside a decoded mixed run) and re-test.
+**Correction (same day).** I first wrote here that real mixed regions have displaced second-allele peaks. Measured
+properly that is wrong: in the decoded mixed regions 65 % of positions have a strong second apex and only 3 % of
+those lie further than 0.35 spacings from the called peak (41.6 % of all positions within 0.1). The real cause
+was the baseline: the per-read model fitted its "single base" hypothesis from the read itself, and in an indel carrier
+about half the read is mixed, so the baseline absorbed the mixture (its median second-peak ratio was 0.70 in carriers,
+0.06 in cloned reads) and the Bayes factor collapsed (BAYES.md, "Global-start model"). Fixed; the synthetic mixtures
+had hidden it because there the baseline was taken from the clean stretch before the indel.
 
 ## What real data is needed next
 

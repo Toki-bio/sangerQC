@@ -25,7 +25,7 @@ import math
 from dataclasses import dataclass
 
 from . import bayes
-from .bayes import GENOTYPES, adapt_alt, fit_null, log10_bf, observations
+from .bayes import GENOTYPES, adapt_model, log10_bf, observations
 from .export import kept_span
 from .secondary import COLOCATE_MAX, secondary_peaks
 from .v0_3 import classify
@@ -60,7 +60,7 @@ def analyze_read(path, name=None, forward=None, reverse=None):
     obs = observations(raw)
     sp = kept_span(pred, len(raw["seq"]))
     span_obs = obs[sp[0] - 1:sp[1]] if sp else obs
-    model, pi = adapt_alt(span_obs, fit_null(span_obs, bayes.DEFAULT_ALT))
+    model, pi = adapt_model(span_obs, bayes.DEFAULT_MODEL)
     raw["bayes"] = dict(pi=pi, model=model)
     return ReadAnalysis(name or path, path, raw, pred, model, pi, sp or (1, len(raw["seq"])))
 
